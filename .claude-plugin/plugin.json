@@ -1,0 +1,12 @@
+{
+  "name": "claude-skills",
+  "description": "Personal collection of Claude Code skills: project-docs, which turns a project description into a complete plan on a fixed TypeScript monorepo baseline, and a git workflow set (git-commit, git-pr, git-pr-fix, git-rename-branch, git-stack).",
+  "version": "1.1.0",
+  "author": {
+    "name": "Elias Júnior",
+    "url": "https://github.com/eliasjnior"
+  },
+  "repository": "https://github.com/eliasjnior/claude-skills",
+  "skills": "./skills/",
+  "keywords": ["git", "pull-requests", "documentation", "planning", "project-setup", "monorepo", "typescript"]
+}
