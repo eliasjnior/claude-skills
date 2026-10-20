@@ -12,9 +12,9 @@
     {
       "name": "claude-skills",
       "source": "./",
-      "description": "Personal collection of Claude Code skills for everyday development work: git workflow, pull requests and project planning.",
+      "description": "Personal collection of Claude Code skills for everyday development work: git workflow, worktrees, pull requests and project planning.",
       "category": "productivity",
-      "tags": ["git", "pull-requests", "workflow", "planning", "productivity"]
+      "tags": ["git", "pull-requests", "worktrees", "workflow", "planning", "productivity"]
     }
   ]
 }
