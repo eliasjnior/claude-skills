@@ -54,7 +54,7 @@ specific to one.
 | **Testing** | The layer table, what is in the default run, the coverage threshold that fails a build, the properties that must hold, and "do not mock our own modules" |
 | **Repository** | The remote every pull request is opened against, and that `main` is protected and is the only merge target. One place, named once. If it is not known yet, `<to be determined>` here and filling it in is the first task of `M0` |
 | **The delivery loop** | The compressed version of `references/workflow.md`: the loop diagram, branch naming tied to milestones, commit convention, size budget, the four sections a body must state, the auto-merge checklist, and what to do when a check fails — three attempts, then `needs-human`. The list of things that are never a fix goes here **verbatim**; this is the file read at the start of every session, so it earns its space here more than anywhere else |
-| **Local development** | The three commands, then the things that are surprising: why processes do not run in containers locally, what the dev script writes and when it refuses to, how several worktrees coexist, what cleaning up requires |
+| **Local development** | The three commands, then the things that are surprising: why processes do not run in containers locally, what the dev script writes and when it refuses to, how several worktrees coexist (one per task, created with `wt switch --create`, ready through `.config/wt.toml`, with their own ports and database), what cleaning up requires |
 
 Keep it under about 300 lines. It is read at the start of every session; length costs attention.
 

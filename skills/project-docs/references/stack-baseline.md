@@ -46,6 +46,7 @@ Two properties that come with the layout and are worth stating explicitly in `NN
 |---|---|
 | **Biome** | Lint and format in one tool, fast enough to run on every commit. It replaces ESLint and Prettier and **adding either back is out of bounds**. It also enforces the package boundaries via `noRestrictedImports`, which is what makes them real rather than a review comment |
 | **Husky** + **lint-staged** | `pre-commit` formats staged files; `pre-push` runs the gate |
+| **worktrunk** (`wt`) | One worktree per task. `.config/wt.toml` makes a new worktree ready on creation (install, env files, its own ports and database), so parallel tasks and parallel agents never share a working tree |
 | **commitlint** | Conventional Commits, scope is the workspace package name. Enforced in a hook and again in CI, because hooks can be bypassed |
 | **Vitest** | Every unit and integration test, in every package |
 | **Testcontainers** | Real Postgres (and Redis, and an SMTP sink) for `*.integration.test.ts` |
@@ -433,6 +434,66 @@ reason. Emit it with the scaffold, and wire the three hooks:
 
 Add `"ci": "./scripts/ci.sh"` and `"ci:fast": "CI_FAST=1 ./scripts/ci.sh"` to the root scripts, so
 the gate is runnable by hand and by the hook through one path.
+
+### `.config/wt.toml` and `.worktreeinclude`
+
+What makes a worktree from `wt switch --create` usable the moment it exists
+(`references/workflow.md` §1.1). Every per-worktree value lands in `.env.worktree`, gitignored and
+loaded after `.env`, so the copied `.env` stays identical to the primary one and the dev script
+reads both.
+
+```toml
+# Worktree lifecycle for worktrunk (`wt`). Every task runs in its own worktree.
+
+[[pre-start]]
+# The env files listed in .worktreeinclude, copied from the primary worktree
+copy = "wt step copy-ignored"
+
+[[pre-start]]
+# Dependencies, and the git hooks husky writes during install, so the push gate exists here too
+install = "pnpm install --frozen-lockfile"
+
+[[pre-start]]
+# This worktree's own ports and database, derived from the branch so they never collide
+env = """
+cat > .env.worktree <<EOF
+API_PORT={{ (repo ~ '-api-' ~ branch) | hash_port }}
+WEB_PORT={{ (repo ~ '-web-' ~ branch) | hash_port }}
+DATABASE_URL=postgres://postgres:postgres@localhost:5432/{{ branch | sanitize_db }}
+EOF
+"""
+
+[[post-start]]
+# The database on the shared dev Postgres. Background, so a stopped Postgres is a log line, not a
+# failed worktree; run `wt hook post-start` again once it is up
+db = '''
+docker compose -f compose.dev.yaml exec -T postgres psql -U postgres -tAc \
+  "SELECT 1 FROM pg_database WHERE datname = '{{ branch | sanitize_db }}'" | grep -q 1 \
+  || docker compose -f compose.dev.yaml exec -T postgres createdb -U postgres {{ branch | sanitize_db }}
+'''
+
+[[post-start]]
+migrate = "pnpm db:migrate"
+
+[list]
+url = "http://localhost:{{ (repo ~ '-web-' ~ branch) | hash_port }}"
+
+[aliases]
+# `wt dev`: this worktree's dev servers, on its own ports
+dev = "pnpm dev"
+```
+
+```text
+# .worktreeinclude — gitignored files every new worktree needs
+.env
+apps/*/.env
+```
+
+`compose.dev.yaml` sets a top-level `name: <project>-dev`, so every worktree talks to the **same**
+backing services instead of starting its own on the same host ports. Isolation comes from a
+database per worktree, not a server per worktree. Dropping the database of a removed worktree is
+deliberately not a hook: it destroys data, so it is a command in the engineering-practices
+document, run by hand. Add `.env.worktree` to `.gitignore`.
 
 ### Also
 

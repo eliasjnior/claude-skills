@@ -160,9 +160,12 @@ job · hooks · local development · environments · secrets · definition of do
 `references/workflow.md` is the source for the middle three sections. Adapt the commands to the
 project; do not soften the gates. In particular this document must state, unambiguously:
 
-- **The loop**, as the diagram in `workflow.md` §1: branch → implement code and tests and the
-  documents the change touches → push, which runs the gate → open the pull request → wait → squash
-  merge and delete the branch → next task. One task in, one merged commit out.
+- **The loop**, as the diagram in `workflow.md` §1: a worktree per task → implement code and tests
+  and the documents the change touches → push, which runs the gate → open the pull request → wait →
+  squash merge → remove the worktree and the branch → next task. One task in, one merged commit
+  out.
+- **How worktrees coexist**, from `workflow.md` §1.1: what the `.config/wt.toml` hooks do, what
+  each worktree gets of its own, and the two commands kept out of the loop.
 - **Which repository** pull requests are opened against, and that `main` is protected and is the
   only merge target.
 - **Where the check suite runs** — a hosted workflow or `scripts/ci.sh` behind `.husky/pre-push` —

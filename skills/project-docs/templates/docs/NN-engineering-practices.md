@@ -30,12 +30,13 @@ One task in, one merged commit out. Repeat until the milestone's **Done when** i
 
 ```
   ┌─ pick the next task from the current milestone
-  ├─ branch      git switch -c <type>/<milestone>-<slug>
+  ├─ worktree    wt switch --create <type>/<milestone>-<slug>
   ├─ implement   the code AND its tests AND the docs it changes
   ├─ gate        git push → .husky/pre-push runs ./scripts/ci.sh
   ├─ open        gh pr create --base main --label goal:<milestone>
   ├─ wait        gh pr checks --watch
-  ├─ merge       gh pr merge --squash --delete-branch
+  ├─ merge       gh pr merge --squash
+  ├─ clean up    git fetch origin && wt remove && git push origin --delete <branch>
   └─ next task ──┘
 ```
 
@@ -101,6 +102,16 @@ milestone.
 | `pre-push` | `./scripts/ci.sh` |
 
 ## 7. Local development
+
+### 7.1 Worktrees
+
+<!-- From references/workflow.md §1.1. One task, one worktree, created with `wt switch --create`.
+     Then the `.config/wt.toml` hooks as a table — hook, what it runs, why — and what each
+     worktree gets of its own: the dev-server ports (hash_port of repo and branch), the database
+     (sanitize_db of the branch, on the shared dev Postgres), and where both are written. Why the
+     backing services are shared rather than per worktree. The two commands kept out of the loop,
+     `wt merge` and `gh pr merge --delete-branch`, each with its reason. What `wt remove` refuses,
+     and that the database of a removed worktree is dropped by hand. -->
 
 ## 8. Environments
 

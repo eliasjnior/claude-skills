@@ -99,8 +99,8 @@ Mandatory. Check, and fix what fails:
 
 `references/stack-baseline.md` §9 has the actual toolchain files the documents promise —
 `package.json`, `pnpm-workspace.yaml`, `turbo.json`, `biome.json` with the boundary rules,
-`tsconfig.base.json`, `commitlint.config.js`. `references/workflow.md` §4 has `scripts/ci.sh` and
-the hooks that run it. Emit them only if the user asks for a scaffold; the default deliverable is
+`tsconfig.base.json`, `commitlint.config.js`, and `.config/wt.toml` with `.worktreeinclude` for
+worktrunk. `references/workflow.md` §4 has `scripts/ci.sh` and the hooks that run it. Emit them only if the user asks for a scaffold; the default deliverable is
 the plan.
 
 ### Phase 8 — Build it (only when asked)
@@ -108,10 +108,10 @@ the plan.
 When the user asks you to implement the plan rather than only write it, **read
 `references/workflow.md` and run the loop it specifies**, one task at a time:
 
-> branch → implement code, tests and the documents the change touches → push, which runs
-> `scripts/ci.sh` through `.husky/pre-push` → wait for it green → `gh pr create` against the
-> repository named in `CLAUDE.md` → wait for checks → `gh pr merge --squash --delete-branch` →
-> next task
+> worktree (`wt switch --create`) → implement code, tests and the documents the change touches →
+> push, which runs `scripts/ci.sh` through `.husky/pre-push` → wait for it green → `gh pr create`
+> against the repository named in `CLAUDE.md` → wait for checks → `gh pr merge --squash` → remove
+> the worktree and the branch → next task
 
 Continue until the milestone's **Done when** is true, updating the "What exists today" table in
 `CLAUDE.md` as part of the last pull request of the milestone.
