@@ -48,14 +48,19 @@ loop, so a human and an agent run the same one:
 
 ```
   ┌─ pick the next task from the current milestone
-  ├─ branch      git switch -c <type>/<milestone>-<slug>
+  ├─ worktree    wt switch --create <type>/<milestone>-<slug>
   ├─ implement   the code AND its tests AND the docs it changes
   ├─ gate        git push → .husky/pre-push runs ./scripts/ci.sh
   ├─ open        gh pr create --base main --label goal:<milestone>
   ├─ wait        gh pr checks --watch
-  ├─ merge       gh pr merge --squash --delete-branch
+  ├─ merge       gh pr merge --squash
+  ├─ clean up    git fetch origin && wt remove && git push origin --delete <branch>
   └─ next task ──┘
 ```
+
+Every task runs in its own [worktrunk](https://worktrunk.dev) worktree, made ready on creation by
+`.config/wt.toml` (install, env files, its own ports and database), so parallel tasks never share a
+working tree.
 
 The gate runs before the pull request exists, so a red branch never becomes somebody's review.
 Three failed attempts on the same check means `needs-human` and stop. Deleting a test, loosening a

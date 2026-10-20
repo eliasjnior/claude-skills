@@ -96,17 +96,23 @@ One task in, one merged commit out. Repeat until the milestone's **Done when** i
 ```
   ┌─ pick the next task from the current milestone
   │
-  ├─ branch:      git switch -c <type>/<milestone>-<slug>
+  ├─ worktree:    wt switch --create <type>/<milestone>-<slug>
   ├─ implement:   the code AND its tests AND the docs it changes
   ├─ gate:        git push  →  .husky/pre-push runs ./scripts/ci.sh
   │                 └─ red? fix the cause and push again. Three attempts, then stop
   ├─ open:        gh pr create --base main --fill --label goal:<milestone>
   ├─ wait:        gh pr checks --watch
-  ├─ merge:       gh pr merge --squash --delete-branch
+  ├─ merge:       gh pr merge --squash
+  ├─ clean up:    git fetch origin && wt remove && git push origin --delete <branch>
   └─ next task ───┘
 ```
 
 The gate runs **before** the pull request exists, so a red branch never becomes somebody's review.
+
+- **One task, one worktree.** The primary checkout stays on `main`. Never `wt merge` (it merges
+  locally and skips the pull request), and never `gh pr merge --delete-branch` (it fails inside a
+  linked worktree; the clean-up step does its job). Never answer a `wt remove` refusal with
+  `--force` or `-D` unless the pull request is merged.
 
 - **Branches:** `feat/m2-<slug>`, `fix/<slug>`. The milestone prefix ties the branch to the roadmap.
 - **Commits and PR titles:** Conventional Commits, scope is the workspace package. Squash merge
@@ -141,5 +147,11 @@ pnpm install
 pnpm dev
 ```
 
+Every task runs in its own worktree: `wt switch --create <branch>`. The hooks in
+`.config/wt.toml` install dependencies (and with them the git hooks), copy the env files listed in
+`.worktreeinclude`, and give the worktree its own ports and database. Nothing is copied by hand.
+`wt list` shows every worktree with its dev-server URL; `wt dev` starts this one's.
+
 <!-- Then the surprising parts: why processes do not run in containers locally, what the dev script
-writes and when it refuses to, how several worktrees coexist, what cleanup requires. -->
+writes and when it refuses to, which ports and database this worktree got and where they are
+written, why the backing services are shared across worktrees, what cleanup requires. -->

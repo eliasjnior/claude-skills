@@ -21,18 +21,48 @@ One task in, one merged commit out. Repeat until the milestone's **Done when** i
 ```
   ┌─ pick the next task from the roadmap milestone
   │
-  ├─ branch:      git switch -c <type>/<milestone>-<slug>
+  ├─ worktree:    wt switch --create <type>/<milestone>-<slug>
   ├─ implement:   the code AND its tests AND the docs it changes
   ├─ gate:        git push  →  .husky/pre-push runs ./scripts/ci.sh
   │                 └─ red? fix the cause and push again. Three attempts, then stop
   ├─ open:        gh pr create --base main --fill --label goal:<milestone>
   ├─ wait:        gh pr checks --watch     (no-op when checks run locally only)
-  ├─ merge:       gh pr merge --squash --delete-branch
+  ├─ merge:       gh pr merge --squash
+  ├─ clean up:    git fetch origin && wt remove && git push origin --delete <branch>
   └─ next task ───┘
 ```
 
 Nothing in this loop is optional and nothing in it is reordered. In particular: **the gate runs
 before the pull request exists**, so a red branch never becomes somebody's review.
+
+### 1.1 One task, one worktree
+
+Every task gets its own worktree, created with [worktrunk](https://worktrunk.dev) (`wt`). The
+primary checkout stays on `main` and clean, two tasks never share a working tree, and several
+tasks can run at once, one agent per worktree, without stepping on each other.
+
+What makes a worktree usable the moment it exists lives in `.config/wt.toml`, versioned with the
+code (`references/stack-baseline.md` §9 has the file): the install, which also writes the git
+hooks, so the gate exists in every worktree; the env files, copied from the primary worktree
+through `.worktreeinclude`; a dev-server port and a database name derived from the branch, so two
+worktrees never collide. Nothing is copied by hand. Project hooks are shell commands from the
+repository, so `wt` runs them only once they are approved on the machine: `wt config approvals add`,
+once per clone and again whenever a hook changes. Without that, a non-interactive `wt switch
+--create` (an agent's) stops at the approval prompt and creates nothing.
+
+Two commands are deliberately not in the loop:
+
+- **`wt merge`.** It merges into `main` locally, which skips the pull request, the review and the
+  hosted checks. Work leaves a worktree through a pull request and nothing else.
+- **`gh pr merge --delete-branch`.** It tries to check out `main` and delete the local branch,
+  and inside a linked worktree that fails because `main` is checked out in the primary one. The
+  clean-up step does the same work explicitly: `wt remove` deletes the worktree and the local
+  branch once the fetch shows it as merged (squash merges included), and the push deletes the
+  remote branch.
+
+`wt remove` refuses a worktree with uncommitted changes and keeps a branch it cannot prove was
+merged. Both refusals are information, not obstacles: never answer them with `--force` or `-D`
+unless the pull request is merged and the leftover is understood.
 
 ## 2. Which repository
 
@@ -170,7 +200,12 @@ skip and the one that catches things.
 
 ```bash
 gh pr checks --watch     # returns non-zero if any check fails
-gh pr merge --squash --delete-branch
+gh pr merge --squash
+
+# then, per §1.1
+git fetch origin
+wt remove                # the worktree, and the local branch now that main contains it
+git push origin --delete <branch>
 ```
 
 **Auto-merge is allowed only when every one of these holds:**
@@ -222,9 +257,10 @@ exist. Those four, and nothing else — in particular, not "this task was hard".
 ## 9. Writing this into the generated plan
 
 `NN-engineering-practices.md` gets §1 to §8 above, adapted, as its **Pull requests**, **The check
-suite** and **Hooks** sections.
+suite** and **Hooks** sections, and §1.1 as the worktree part of **Local development**.
 
 `CLAUDE.md` gets the compressed version: the **Repository** block from §2, the loop diagram from
-§1, the auto-merge checklist from §6, and the never-do list from §7 verbatim. It is the file an
+§1, the two commands §1.1 keeps out of the loop, the auto-merge checklist from §6, and the
+never-do list from §7 verbatim. It is the file an
 agent reads at the start of every session, so the never-do list earns its space there more than
 anywhere else.
