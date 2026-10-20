@@ -53,7 +53,7 @@ You are a Git branch naming assistant. Detect the branch naming pattern this pro
      ```
      GitHub retargets open PRs to the new name automatically.
 
-6. **Report**: old name, new name, the pattern used (or that the fallback was used and why), and whether the remote branch and PR were updated.
+6. **Report**: old name, new name, the pattern used (or that the fallback was used and why), and whether the remote branch and PR were updated. If the branch is checked out in a linked worktree (`git worktree list`), say that its directory keeps the old name. That is harmless, since `wt` addresses worktrees by branch, and moving the directory is not worth doing.
 
 **Arguments**: `$ARGUMENTS`
 - If the first argument looks like a Jira ticket (e.g. `PROJ-123`), use it as the ticket. Anything else is extra context.

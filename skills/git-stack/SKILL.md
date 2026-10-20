@@ -24,6 +24,7 @@ You are a Pull Request splitting assistant. Take the work on the current branch 
 
 1. **Preflight**
    - `gh stack --version`. If the extension is missing, STOP and tell the user to run `gh extension install github/gh-stack`. Do not fall back to a manual `gh pr create` chain. Requires Git 2.36+.
+   - Worktrees: `git worktree list`. Run the whole split from the worktree that has the original branch checked out, since `gh stack` checks out the part branches there. A part branch name already checked out in another worktree cannot be checked out here: pick another name.
    - `git config rerere.enabled true`, so `gh stack init` does not stop to ask for it.
    - Remotes: if the repo has more than one remote and `git config remote.pushDefault` is unset, pass `--remote origin` (or the right remote) to every `submit`, `sync`, `rebase`, and `link`.
    - `git fetch` and make sure the trunk is up to date. The trunk is the default branch: `gh repo view --json defaultBranchRef -q .defaultBranchRef.name`.
@@ -76,7 +77,7 @@ You are a Pull Request splitting assistant. Take the work on the current branch 
    - `gh stack view --short` for the final state.
 
 8. **Drop the original branch**
-   - Only after step 6 passed and step 7 succeeded: `git branch -D <original-branch>`.
+   - Only after step 6 passed and step 7 succeeded: `git branch -D <original-branch>`. The current worktree is on a part branch by now, so the original is checked out nowhere and git lets it go. If `git worktree list` still shows it in another worktree, leave that worktree and the branch alone and tell the user to run `wt remove <original-branch>` (or `/git-worktree clean`) once they are done with it.
    - If the original branch exists on the remote and has **no** open PR: `git push origin --delete <original-branch>`.
    - If it has an open PR, leave the remote branch alone (deleting it would close the PR) and ask the user to close the PR manually.
    - End on the bottom branch of the stack (`gh stack bottom`).
