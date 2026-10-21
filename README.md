@@ -30,7 +30,7 @@ As a plugin, if you prefer that:
 | Skill | What it does | Invoke | Model |
 |---|---|---|---|
 | [`git-commit`](skills/git-commit) | Groups the current changes by concern and commits each group with Conventional Commits, leaving sensitive files out | `/git-commit [jira] [context]` | haiku |
-| [`git-pr`](skills/git-pr) | Commits pending work, renames the branch to the project's pattern, pushes, and opens a pre-filled PR in the browser for you to submit | `/git-pr [jira] [context]` | haiku |
+| [`git-pr`](skills/git-pr) | Commits pending work, renames the branch to the project's pattern, pushes, and opens a pre-filled PR in the browser for you to submit, or creates it directly with `--create` / as a draft with `--draft` | `/git-pr [--create\|--draft] [jira] [context]` | haiku |
 | [`git-pr-fix`](skills/git-pr-fix) | Triages the open review threads on a PR, asks which to address, and applies the approved ones without committing | `/git-pr-fix [pr] [context]` | default, high effort |
 | [`git-rename-branch`](skills/git-rename-branch) | Detects the project's branch naming pattern and renames the current branch to match, falling back to `<user>/<summary>` | `/git-rename-branch [jira] [context]` | haiku |
 | [`git-worktree`](skills/git-worktree) | Creates a [worktrunk](https://worktrunk.dev) worktree for a task and moves the session into it, runs several tasks in parallel worktrees, lists them, and cleans up the ones whose PR was merged | `/git-worktree [list\|clean\|exit] [jira] [-- task]` | default |
@@ -53,8 +53,9 @@ working tree to reviewable pull requests.
   in the format from `references/commit-format.md`. Files that look sensitive are left out and
   listed in the summary.
 - **`git-pr`** commits anything pending, checks the branch name with `git-rename-branch`'s rules,
-  pushes, and runs `gh pr create --web`. It never creates the PR itself: the form opens pre-filled
-  in the browser and you submit it.
+  pushes, and runs `gh pr create --web`. By default it never creates the PR itself: the form opens
+  pre-filled in the browser and you submit it. `--create` (alias `--auto`) creates it directly, and
+  `--draft` creates it directly as a draft, since `gh` does not accept `--draft` with `--web`.
 - **`git-pr-fix`** reads the PR's review threads through GraphQL, skipping resolved ones and
   flagging outdated ones, categorizes them, and asks per comment whether to address it. Approved
   changes stay in the working tree with a suggested commit message.
@@ -131,8 +132,11 @@ integration.
 
 - **`project-docs`** turns a project description into a full documentation set: `PROJECT.md`,
   `CLAUDE.md`, `README.md` and a numbered `docs/` spine, with a decision register, identified
-  requirements and a delivery loop. It plans on a fixed TypeScript monorepo stack and decides only
-  the slots that genuinely vary per project. [`skills/project-docs/README.md`](skills/project-docs/README.md)
+  requirements and a delivery loop, with every diagram in Mermaid. It plans on a fixed baseline per
+  platform (a TypeScript monorepo for web services and apps, a native Swift app for macOS, or a
+  TypeScript CLI), plans the GitHub repository itself (a ruleset on `main`, squash merge, branches
+  deleted on merge, hosted unit, integration and end-to-end checks), and decides only the slots that
+  genuinely vary per project. [`skills/project-docs/README.md`](skills/project-docs/README.md)
   has the document set, the stack and the loop.
 
 ## Adding a skill
