@@ -1,4 +1,8 @@
-<!-- TEMPLATE. Spec: references/document-specs.md. Write SQL-shaped tables, not ORM code. -->
+<!-- TEMPLATE. Spec: references/document-specs.md. Write SQL-shaped tables, not ORM code.
+     An erDiagram above §2 shows the relations; the tables stay authoritative.
+     On macos, §2 is "Files": every file split by writer (config.json, state.json, cache/), every
+     key, then every Keychain item. See document-specs.md, 04, macos.
+     On cli, §2 is the config file, state and cache, and every credential. See 04, cli. -->
 # 04 — Data, identity and privacy
 
 ## 1. Conventions

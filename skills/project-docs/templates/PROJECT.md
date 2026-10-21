@@ -34,12 +34,18 @@ in <the current platform> is <the actual cost>, on every single <unit>" is.
 
 ## 2. The proposal
 
-<!-- What replaces it. A BEFORE/AFTER diagram earns its place here more than anywhere else. -->
+<!-- What replaces it. A before/after diagram earns its place here more than anywhere else. -->
 
-```
-BEFORE                                    AFTER
-
-<current shape>                           <target shape>
+```mermaid
+flowchart LR
+    subgraph before["Before"]
+        direction TB
+        %% the current shape
+    end
+    subgraph after["After"]
+        direction TB
+        %% the target shape
+    end
 ```
 
 Concretely:

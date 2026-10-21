@@ -1,7 +1,9 @@
 # Document specifications
 
 What each document owes. Sections are the reference set's, numbered so `§n` references work.
-A section with nothing real in it is deleted, not padded.
+A section with nothing real in it is deleted, not padded. Where a document's sections differ by
+profile, both tables are here; use the one for the profile chosen in Phase 0. Diagrams follow
+`references/diagrams.md`.
 
 ---
 
@@ -34,7 +36,8 @@ Named for the subject, never `domain`. Usually the longest document in the set.
 Specified to the level of a test: the actual rule, the actual ordering, the actual tie-break, the
 actual precedence. Required:
 
-- **The flow end to end**, as a numbered walk or a diagram, with what is true after each step.
+- **The flow end to end**, as a numbered walk or a Mermaid diagram, with what is true after each
+  step. A lifecycle with states is a `stateDiagram-v2`.
 - **The inputs it needs**, and where each comes from.
 - **The rules**, one section each, in the order they apply.
 - **Worked examples.** Concrete inputs, the expected outcome, and *why* — including at least one
@@ -48,6 +51,8 @@ wins when two apply.
 ---
 
 ## `03-architecture.md` — Architecture
+
+### web
 
 | § | Section | Content |
 |---|---|---|
@@ -64,11 +69,48 @@ wins when two apply.
 | 11 | Deployment | Images, processes, topology, what recreates what |
 | 12 | Open technical questions | The ones that are honestly still open, each pointing at its `D-xx` |
 
+### macos
+
+| § | Section | Content |
+|---|---|---|
+| 1 | The central idea | The same paragraph, for an app — "the kit decides, the app shows" |
+| 2 | Repository layout | The tree, with one line per directory, `apps/macos` down to the feature folders |
+| 3 | Targets and boundaries | Every target of `<Name>Kit`: responsibility, what it depends on. Then the graph as a Mermaid `flowchart`, and **how it is enforced**: SwiftPM's declared dependencies, plus `check-imports.sh` for what the compiler cannot see |
+| 4 | The main path | The poll, the event or the user action the product exists for, step by step: who performs it, through which port. A `sequenceDiagram` |
+| 5 | Scheduling | Every timer and trigger: cadence, backoff, what happens on sleep and wake, on network loss, at launch, and what makes a tick safe to repeat |
+| 6 | Credentials | Where the app's credentials come from, where they live (the Keychain), when they are re-read, what a `401` does |
+| 7 | Ports and adapters | The protocol per external system, the adapter behind it, and the fake used in store tests |
+| 8 | Configuration | `Info.plist` keys, the xcconfig, build settings per configuration, and why there is no `.env` |
+| 9 | Storage | Pointer to `04-data.md`, plus the write path: atomic writes, who owns each file |
+| 10 | Distribution and updates | Signing, how a build reaches the Mac, how the app updates itself and what it verifies first. Its own document when `NN-distribution.md` was earned |
+| 11 | Concurrency | Which actors exist, what runs on the main actor, how a store publishes one value per update |
+| 12 | Observability | `os.Logger` subsystems and categories, what is never logged, how to read the log |
+| 13 | Open technical questions | The ones honestly still open, each pointing at its `D-xx` |
+
+### cli
+
+| § | Section | Content |
+|---|---|---|
+| 1 | The central idea | The same paragraph, for a tool — "the core decides, the command renders" |
+| 2 | Repository layout | The tree, `src/` down to the command files |
+| 3 | Layers and boundaries | `core`, `commands`, `adapters`, `render`: what each may import, and **how it is enforced** (Biome's rules on `src/core/**`). Then `main(argv, io)` and why the process is an argument |
+| 4 | The command tree | **Every command and subcommand**: its arguments, its flags with defaults, what it prints, its `--json` shape, its exit codes. A table per command. This is the public interface, and a rename is a breaking change |
+| 5 | The command-line contract | stdout and stderr, `--json`, the exit code table, TTY rules, colour, errors, Ctrl-C (`references/stack-cli.md` §3), adapted |
+| 6 | The main path | The command the product exists for, step by step through its ports. A `sequenceDiagram` |
+| 7 | Ports and adapters | The interface per external system, the adapter behind it, the stub server used in tests |
+| 8 | Configuration | The precedence chain, every config key and every environment variable, and `config show` |
+| 9 | Storage | Pointer to `04-data.md`, plus the write path: atomic writes, what is safe to delete |
+| 10 | Distribution | How it reaches a machine, what the published artifact contains, the supported platforms and Node majors. Its own document when `NN-distribution.md` was earned |
+| 11 | Observability | `--verbose`, what is never printed, and that there is no telemetry |
+| 12 | Open technical questions | The ones honestly still open, each pointing at its `D-xx` |
+
 The stack belongs here as a `§` only in summary form, pointing at `NN-stack.md`, which owns it.
 
 ---
 
 ## `04-data.md` — Data, identity and privacy
+
+### web
 
 | § | Section | Content |
 |---|---|---|
@@ -81,7 +123,29 @@ The stack belongs here as a `§` only in summary form, pointing at `NN-stack.md`
 | 7 | Privacy | The regime that applies (LGPD, GDPR), the lawful basis, the subject-access and deletion paths |
 
 Write the schema as SQL-shaped tables, not as ORM code. The ORM is an implementation of this
-document, not a substitute for it.
+document, not a substitute for it. An `erDiagram` above the tables shows the relations; the tables
+stay authoritative.
+
+### macos
+
+| § | Section | Content |
+|---|---|---|
+| 1 | Conventions | Where files live, encoding, dates (ISO 8601, UTC), `schemaVersion`, atomic writes, what happens to a file that does not decode |
+| 2 | Files | **Every file**, split by who writes it (`config.json`, `state.json`, `cache/`), with every key: type, default, what writes it, what reads it. Then every Keychain item and every `UserDefaults` key, with why it lives there |
+| 3 | Derived data | What is computed from the files at launch rather than stored, and why |
+| 4 | Retention | What is pruned when, and by what |
+| 5 | What we deliberately do not store | The most valuable section here, as on web |
+| 6 | Security | What is in the Keychain, file permissions, what leaves the Mac and to whom |
+| 7 | Privacy | What a reset removes, how the user exports or deletes everything, and the regime that applies if anything leaves the Mac |
+
+If persistence took GRDB (`references/stack-macos.md` §8), §2 is SQL-shaped tables as on web.
+
+### cli
+
+The macos sections, with §2 as: the config file with every key (type, default, the environment
+variable that overrides it), the state and cache directories with every file in them, and every
+credential — where it is read from, in which order, and where it is stored when the tool stores
+it. §6 adds what the tool sends over the network and to whom; §7 is usually short, and says so.
 
 ---
 
@@ -160,19 +224,25 @@ job · hooks · local development · environments · secrets · definition of do
 `references/workflow.md` is the source for the middle three sections. Adapt the commands to the
 project; do not soften the gates. In particular this document must state, unambiguously:
 
-- **The loop**, as the diagram in `workflow.md` §1: a worktree per task → implement code and tests
+- **The loop**, as the Mermaid diagram and command table in `workflow.md` §1: a worktree per task → implement code and tests
   and the documents the change touches → push, which runs the gate → open the pull request → wait →
   squash merge → remove the worktree and the branch → next task. One task in, one merged commit
   out.
 - **How worktrees coexist**, from `workflow.md` §1.1: what the `.config/wt.toml` hooks do, what
   each worktree gets of its own, and the two commands kept out of the loop.
-- **Which repository** pull requests are opened against, and that `main` is protected and is the
-  only merge target.
-- **Where the check suite runs** — a hosted workflow or `scripts/ci.sh` behind `.husky/pre-push` —
+- **Which repository** pull requests are opened against, that `main` is protected and is the
+  only merge target, and **what protected means**: the settings and the ruleset from
+  `references/repository.md` §1 and §2 as a table of setting, value and why, applied by
+  `scripts/configure-repo.sh`. On a private repository without a paid plan, that the ruleset is
+  not enforced and what that leaves.
+- **Where the check suite runs** — a hosted workflow or `scripts/ci.sh` behind the pre-push hook
+  (`.husky/pre-push` on web, lefthook on macos) —
   and what that choice costs. If it is the local hook, say plainly that `--no-verify` is the way
   past the only gate there is.
-- **The check suite job by job**, and that a job whose subject does not exist yet skips *with its
-  reason printed* rather than failing or passing silently.
+- **The check suite job by job**, with **one job per test layer** (unit, integration, end to end),
+  and that a job whose subject does not exist yet skips *with its reason printed* rather than
+  failing or passing silently. When the checks are hosted, the jobs of `.github/workflows/ci.yml`
+  (`references/repository.md` §4), each named as the ruleset requires it.
 - **The pull request body's four sections**: what changed, why (milestone and `FR-xx`), how it was
   verified, and the risk if it is wrong.
 - **The auto-merge conditions**, as a checklist every item of which must hold.
@@ -209,6 +279,10 @@ pull requests, not one.
 
 Every milestone has a **Done when** sentence that is checkable by someone who did not write it.
 
+`M0` always includes the repository: create it, land `.github/` (the workflow, Dependabot, the
+pull request template), run `scripts/configure-repo.sh`, and prove the gate by opening a pull
+request that a deliberately failing check blocks. Its **Done when** names that proof.
+
 No dates. Then: dated tasks *after* launch, for the things whose failure mode is being forgotten
 (a licence to cancel, a fallback to delete, a compatibility route to remove) · the next versions ·
 a **risks table** of risk · impact · what we do about it, where the third column is a mechanism
@@ -227,8 +301,12 @@ day or two of mechanical change), High (reaches into how the product is written)
 matters more than the version: a low-cost dependency can be chosen quickly and revisited cheaply; a
 high-cost one is a decision that will still be true in three years.
 
-Then one table per layer: language and runtime · backend · frontend · provider integrations ·
-testing · tooling · infrastructure · observability. Every row: what · version · **why** · cost to
+Then one table per layer. **web:** language and runtime · backend · frontend · provider
+integrations · testing · tooling · infrastructure · observability. **macos:** language and UI ·
+project and packages · persistence · networking and providers · testing · tooling · distribution ·
+observability. **cli:** language and runtime · command line (parser, prompts, output) ·
+configuration and credentials · networking and providers · testing · tooling and build ·
+distribution · observability. Every row: what · version · **why** · cost to
 replace. Close with **what was deliberately not used**, which is the section worth exporting most,
 because an absence leaves no trace in a lockfile.
 
@@ -247,3 +325,26 @@ from · which process needs it · what breaks without it · rotation, per secret
 section of gaps to know about before you blame the configuration.
 
 Say which credentials are **not** needed to develop, and what stands in for them locally.
+
+On **macos** the document covers the signing certificate (creating it, exporting the PKCS#12, the
+CI secrets that hold it), the update signing key, any token the app reads, and the first launch
+(Gatekeeper, notification permission, launch at login). Environment variables are only the CI
+secrets; the app itself reads none.
+
+On **cli** the document covers the token for each API the tool calls (how a user creates one, its
+scopes, the environment variable and the `auth login` path), and the release side: npm trusted
+publishing configured on the package, and the Homebrew tap's token when there is one.
+
+---
+
+## `NN-distribution.md` — signing, releases and updates *(macos, cli)*
+
+Only when earned (`references/doc-set.md`). Signing identity and why it is stable · the release
+pipeline from a merged release pull request to the published assets · versioning and the build
+number · every release asset and what it contains · the update flow end to end, with **every check
+the app makes before replacing itself, in order** · what happens when a check fails · development
+builds and what they skip · how to recover a broken install by hand.
+
+On **cli**: every artifact and where it is published (the npm package and its provenance, each
+binary and its target, the Homebrew formula), how the release workflow builds and publishes them,
+how each install path upgrades, and how a bad release is deprecated or yanked.

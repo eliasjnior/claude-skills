@@ -3,11 +3,13 @@
 Illustrative passages written in the voice of the reference set. Read these when the prose is
 coming out generic. Rules describe the voice; these demonstrate it.
 
-Every product, name and number below is fictional. Two imaginary projects carry the examples:
+Every product, name and number below is fictional. Three imaginary projects carry the examples:
 
 - **A marketplace rewrite**: a tutoring marketplace that routes each student request to a tutor
   agency, and bills agencies per request received.
 - **A multi-tenant SaaS bot**: a chat bot that tracks pull requests and nudges reviewers.
+- **Beacon** (macos profile): a menu bar app that watches the status pages of the services a team
+  depends on and notifies when one degrades.
 
 ---
 
@@ -149,25 +151,33 @@ Claims what is true, names what is not, points at the authority for both. Three 
 
 ## A before/after that carries a whole document
 
+```mermaid
+flowchart LR
+    subgraph before["Before"]
+        direction TB
+        site1[Website] --> fn["createRequest (serverless function)"]
+        fn --> doc[(Document write)]
+        doc -->|on create| mail1[Emails]
+        doc -->|on create| push1[Push]
+        fn -->|inline| sms1[SMS]
+        doc -->|on write| repair[Counter repair]
+        cron[Cron] --> sync[Availability sync]
+    end
+    subgraph after["After"]
+        direction TB
+        site2[Website] --> api["POST /requests (apps/api, Elysia, Node 22)"]
+        api --> tx[("One Postgres transaction: request, matched agencies, counter increments, outbox rows")]
+        tx --> worker[Worker drains the outbox]
+        worker --> out["Emails, push, SMS"]
+    end
 ```
-BEFORE                                    AFTER
 
-website ──▶ createRequest                 website ──▶ POST /requests
-              (serverless function)                     (apps/api, Elysia, Node 22)
-                   │                                         │
-                   ▼                                         ▼
-              document write                         one Postgres transaction:
-                   │                                    request + matched agencies
-                   ├── on create ──▶ emails             + counter increments
-                   ├── on create ──▶ push               + outbox rows
-                   └── (inline)  ──▶ SMS                      │
-                                                              ▼
-              on write  ──▶ counter repair             worker drains outbox:
-              cron      ──▶ availability sync            emails, push, SMS
-```
+Every trigger on the left becomes either a row in the same transaction or an outbox entry on the
+right, and the diagram says so without a paragraph.
 
 And the same idea applied to a product surface rather than an architecture — the state of one
-message at four points in time, which is the whole product argument in twelve lines:
+message at four points in time, which is the whole product argument in twelve lines. This one stays
+plain text, because it is a mockup of what a person reads, not a graph:
 
 ```
   t+0     🟡 #4743 ci: make renovate ignore @northwind/ui packages    S · +12/−3

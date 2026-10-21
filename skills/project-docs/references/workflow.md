@@ -18,19 +18,35 @@ Two audiences, one process:
 
 One task in, one merged commit out. Repeat until the milestone's **Done when** is true.
 
+```mermaid
+flowchart TD
+    pick["Pick the next task from the milestone"] --> worktree["Create its worktree"]
+    worktree --> implement["Implement the code, its tests and the docs it changes"]
+    implement --> gate{"Push: does scripts/ci.sh pass?"}
+    gate -->|red| fix["Fix the actual cause"]
+    fix --> gate
+    gate -->|red on the third attempt| human(["Label needs-human and stop"])
+    gate -->|green| open["Open the pull request"]
+    open --> checks{"Checks green and every auto-merge condition holds?"}
+    checks -->|a check is red| fix
+    checks -->|a condition fails| human
+    checks -->|yes| merge["Squash merge"]
+    merge --> cleanup["Remove the worktree and the branch"]
+    cleanup --> done{"Is the milestone Done when true?"}
+    done -->|no| pick
+    done -->|yes| report(["Update What exists today and report"])
 ```
-  ┌─ pick the next task from the roadmap milestone
-  │
-  ├─ worktree:    wt switch --create <type>/<milestone>-<slug>
-  ├─ implement:   the code AND its tests AND the docs it changes
-  ├─ gate:        git push  →  .husky/pre-push runs ./scripts/ci.sh
-  │                 └─ red? fix the cause and push again. Three attempts, then stop
-  ├─ open:        gh pr create --base main --fill --label goal:<milestone>
-  ├─ wait:        gh pr checks --watch     (no-op when checks run locally only)
-  ├─ merge:       gh pr merge --squash
-  ├─ clean up:    git fetch origin && wt remove && git push origin --delete <branch>
-  └─ next task ───┘
-```
+
+| Step | Command |
+|---|---|
+| worktree | `wt switch --create <type>/<milestone>-<slug>` |
+| gate | `git push`, whose pre-push hook runs `./scripts/ci.sh` |
+| open | `gh pr create --base main --fill --label goal:<milestone>` |
+| wait and merge | `gh pr merge --squash --auto` when the checks are hosted; `gh pr merge --squash` when they run locally only |
+| clean up | `git fetch --prune origin && wt remove` |
+
+The pre-push hook is `.husky/pre-push` on the web profile and lefthook's `pre-push` on macos. Both
+run the same `./scripts/ci.sh`.
 
 Nothing in this loop is optional and nothing in it is reordered. In particular: **the gate runs
 before the pull request exists**, so a red branch never becomes somebody's review.
@@ -42,10 +58,12 @@ primary checkout stays on `main` and clean, two tasks never share a working tree
 tasks can run at once, one agent per worktree, without stepping on each other.
 
 What makes a worktree usable the moment it exists lives in `.config/wt.toml`, versioned with the
-code (`references/stack-baseline.md` §9 has the file): the install, which also writes the git
-hooks, so the gate exists in every worktree; the env files, copied from the primary worktree
-through `.worktreeinclude`; a dev-server port and a database name derived from the branch, so two
-worktrees never collide. Nothing is copied by hand. Project hooks are shell commands from the
+code (§9 of the profile's baseline file has it): the install, which also writes the git hooks,
+so the gate exists in every worktree. On web, also the env files, copied from the primary worktree
+through `.worktreeinclude`, and a dev-server port and a database name derived from the branch, so
+two worktrees never collide. On macos, the generated Xcode project instead, since it is never
+committed; build products stay inside the worktree, and the one thing two worktrees still share is
+the development build's bundle identifier. Nothing is copied by hand. Project hooks are shell commands from the
 repository, so `wt` runs them only once they are approved on the machine: `wt config approvals add`,
 once per clone and again whenever a hook changes. Without that, a non-interactive `wt switch
 --create` (an agent's) stops at the approval prompt and creates nothing.
@@ -55,10 +73,10 @@ Two commands are deliberately not in the loop:
 - **`wt merge`.** It merges into `main` locally, which skips the pull request, the review and the
   hosted checks. Work leaves a worktree through a pull request and nothing else.
 - **`gh pr merge --delete-branch`.** It tries to check out `main` and delete the local branch,
-  and inside a linked worktree that fails because `main` is checked out in the primary one. The
-  clean-up step does the same work explicitly: `wt remove` deletes the worktree and the local
-  branch once the fetch shows it as merged (squash merges included), and the push deletes the
-  remote branch.
+  and inside a linked worktree that fails because `main` is checked out in the primary one. It is
+  also redundant: the repository deletes the remote branch on merge (`references/repository.md`
+  §1), and `wt remove` deletes the worktree and the local branch once the fetch shows it as merged
+  (squash merges included).
 
 `wt remove` refuses a worktree with uncommitted changes and keeps a branch it cannot prove was
 merged. Both refusals are information, not obstacles: never answer them with `--force` or `-D`
@@ -74,6 +92,10 @@ The remote is decided once, at intake, and written into `CLAUDE.md` under **Repo
 `git@github.com:<owner>/<repo>.git` — `main` is protected and is the only merge target.
 Every pull request is opened against it. There is no second remote and no fork.
 ```
+
+What "protected" means — squash only, branch deleted on merge, auto-merge allowed, a ruleset
+requiring every hosted check, no bypass — is in `references/repository.md`, applied by
+`scripts/configure-repo.sh` as a task of `M0`.
 
 If it is not known at planning time, the plan says `<to be determined>` in that one place and
 nowhere else, and the first task of `M0` is to create it and fill it in. Never guess a remote, and
@@ -95,8 +117,9 @@ snapshots. If it does not fit, it is more than one pull request — stack them.
 
 ## 4. The gate: `scripts/ci.sh`
 
-One file holds every check job. `.husky/pre-push` runs it, so a push is the gate and the pull
-request is proved before it is opened rather than after.
+One file holds every check job. The pre-push hook runs it, so a push is the gate and the pull
+request is proved before it is opened rather than after. The script below is the web profile's;
+the macos one, with the same structure, is in `references/stack-macos.md` §9.
 
 The file **skips rather than fails** for a job whose subject does not exist yet, so the same script
 is correct from `M0` to the last milestone and the suite grows by things being built rather than by
@@ -135,10 +158,17 @@ fi
 
 if [ -n "${CI_FAST:-}" ]; then
   skip "integration tests" "CI_FAST=1"
+  skip "end-to-end tests"  "CI_FAST=1"
 elif ! docker info >/dev/null 2>&1; then
   skip "integration tests" "Docker is not running"
+  skip "end-to-end tests"  "Docker is not running"
 else
   run "integration tests" pnpm turbo test:integration
+  if [ -d apps/web/e2e ]; then
+    run "end-to-end tests" pnpm turbo test:e2e
+  else
+    skip "end-to-end tests" "no browser surface yet"
+  fi
 fi
 
 if [ ${#failed[@]} -gt 0 ]; then
@@ -163,9 +193,11 @@ Two properties worth keeping and worth writing down:
 
 ### When the checks are hosted instead
 
-If `NN-engineering-practices.md` put the suite in GitHub Actions, the workflow runs the same
-`scripts/ci.sh`, and `pre-push` stays as a fast local subset. The loop is unchanged; only step
-`wait` becomes real.
+If `NN-engineering-practices.md` put the suite in GitHub Actions, `.github/workflows/ci.yml` has
+one job per `scripts/ci.sh` job, calling the same package scripts (`references/repository.md` §4
+has it per profile), the ruleset requires every one of them, and `pre-push` stays as the fast local
+proof. The loop is unchanged; the merge step becomes `gh pr merge --squash --auto`, which waits for
+the required checks itself.
 
 **Say out loud which one is true**, and if it is the local hook, say what it costs: the checks are
 enforced by the author's own machine, so `git push --no-verify` is a way past them and a green pull
@@ -199,14 +231,19 @@ skip and the one that catches things.
 ## 6. Wait, then merge
 
 ```bash
-gh pr checks --watch     # returns non-zero if any check fails
+# hosted checks: GitHub merges once every required check is green
+gh pr merge --squash --auto
+gh pr checks --watch     # returns non-zero if any check fails; then fix and push, per §7
+
+# local checks only: the gate already ran on push
 gh pr merge --squash
 
-# then, per §1.1
-git fetch origin
+# then, per §1.1. The remote branch was deleted by the merge.
+git fetch --prune origin
 wt remove                # the worktree, and the local branch now that main contains it
-git push origin --delete <branch>
 ```
+
+Enable auto-merge only after the conditions below were checked: it merges without asking again.
 
 **Auto-merge is allowed only when every one of these holds:**
 
@@ -215,7 +252,11 @@ git push origin --delete <branch>
 - there is no `needs-human` label;
 - no file is touched under CI workflows, infrastructure or deployment config, migrations with
   destructive DDL, or anything holding secrets;
-- no public type in the pure domain package changed;
+- *macos:* no change to signing, entitlements, the bundle identifier, the updater's checks, or a
+  persisted file format without a decoder for the previous version;
+- *cli:* no command, flag or `--json` field removed or renamed, and no exit code changed;
+- no public type in the pure domain package changed (`packages/domain` on web, `<Name>Core` on
+  macos, `src/core` on cli);
 - no decision-recording document in `docs/` changed;
 - the diff is within the size budget.
 
@@ -257,10 +298,12 @@ exist. Those four, and nothing else — in particular, not "this task was hard".
 ## 9. Writing this into the generated plan
 
 `NN-engineering-practices.md` gets §1 to §8 above, adapted, as its **Pull requests**, **The check
-suite** and **Hooks** sections, and §1.1 as the worktree part of **Local development**.
+suite** and **Hooks** sections, and §1.1 as the worktree part of **Local development**. Its
+repository section gets the settings and the ruleset from `references/repository.md`, each with
+its reason.
 
 `CLAUDE.md` gets the compressed version: the **Repository** block from §2, the loop diagram from
-§1, the two commands §1.1 keeps out of the loop, the auto-merge checklist from §6, and the
+§1 with its command table, the two commands §1.1 keeps out of the loop, the auto-merge checklist from §6, and the
 never-do list from §7 verbatim. It is the file an
 agent reads at the start of every session, so the never-do list earns its space there more than
 anywhere else.

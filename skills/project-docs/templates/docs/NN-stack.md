@@ -26,6 +26,13 @@ those are the rows worth arguing about before adopting.
 
 ---
 
+<!-- Sections below are the web layers. On macos: language and UI · project and packages ·
+     persistence · networking and providers · testing · tooling · distribution · observability.
+     Baseline: references/stack-macos.md.
+     On cli: language and runtime · command line · configuration and credentials · networking
+     and providers · testing · tooling and build · distribution · observability.
+     Baseline: references/stack-cli.md. -->
+
 ## 2. Language and runtime
 
 | What | Version | Why | Cost to replace |

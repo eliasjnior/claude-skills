@@ -1,10 +1,12 @@
 # project-docs
 
 Turns a project description into a complete plan: `PROJECT.md`, `CLAUDE.md`, `README.md` and a
-numbered `docs/` set, on a fixed TypeScript monorepo baseline.
+numbered `docs/` set, on a fixed baseline for the project's platform: a TypeScript monorepo for
+web services and apps, a native Swift app for macOS, or a TypeScript command-line tool. Every
+diagram it draws is Mermaid, inside the plan's own Markdown.
 
-Derived from two existing projects whose documentation shares one shape and one toolchain, so a
-third project inherits the reasoning rather than re-deriving it.
+Derived from existing projects whose documentation shares one shape and, per platform, one
+toolchain, so the next project inherits the reasoning rather than re-deriving it.
 
 ```
 PROJECT.md          problem · proposal · principles · scope · document map · D-xx register
@@ -33,7 +35,9 @@ docs/
    decided, and each one is decided in the register with its alternative named.
 4. **Absences are recorded.** "What was deliberately not used", with reasons.
 
-**The stack it plans on.** Fixed: TypeScript strict · Node ≥ 22 · pnpm + Turborepo · Biome (no
+**The stack it plans on**, per profile, picked at intake.
+
+*web.* Fixed: TypeScript strict · Node ≥ 22 · pnpm + Turborepo · Biome (no
 ESLint, no Prettier) · Zod at every boundary · PostgreSQL + Drizzle · Pino ·
 Vitest / Testcontainers / Playwright · Next.js + Tailwind where there is a UI.
 
@@ -43,24 +47,66 @@ from. Decided per project, each with its alternative named and priced: the HTTP 
 or Hono), the runtime (Node or Bun), background work (transactional outbox or BullMQ), Postgres
 hosting, identity, object storage, mail, where the check suite runs, deployment, and tenancy.
 
+*macos.* Fixed: Swift 6 with complete strict concurrency · SwiftUI, with AppKit for the status item
+and popover · XcodeGen (the `.xcodeproj` is generated, never committed) · one `<Name>Kit` Swift
+package with a target per concern, the boundaries enforced by SwiftPM · swift-format and SwiftLint
+· Swift Testing · lefthook · gitleaks · release-please · `os.Logger` · a `--snapshot` mode so an
+agent can check a view. Decided per project: the deployment target, persistence (JSON files split
+by writer, or GRDB), signing (self-signed, Developer ID, App Store), updates (an updater of its own
+over GitHub Releases, Sparkle, App Store), credentials, the sandbox, and where the check suite
+runs (hosted macOS minutes cost ten times as much on a private repository).
+
+*cli.* Fixed: the web toolchain without the server (TypeScript strict, Node ≥ 22, pnpm, Biome,
+Zod, Vitest) · commander · @clack/prompts only on a TTY · tsdown bundling everything into one file
+· a pure `src/core` and `main(argv, io)` so every command runs in-process in a test · a written
+command-line contract (stdout is data, `--json`, documented exit codes, no prompt without a TTY)
+· XDG paths · unit, in-process integration, and golden end-to-end tests against the packed and
+installed package · npm trusted publishing. Decided per project: distribution (npm, or binaries
+with a Homebrew tap), platforms, credentials, layout, per-directory config, update notice, and
+where the check suite runs.
+
+**The repository, for every profile.** A `scripts/configure-repo.sh` the user runs once in `M0`:
+squash merge only, auto-merge allowed, branches deleted on merge, Dependabot security updates,
+labels the loop uses, and a ruleset on `main` (no deletion or force push, linear history, a pull
+request, conversations resolved, every hosted check required, no bypass). A hosted workflow with
+one job per test layer, unit, integration and end to end, matching the local gate job for job.
+
+When the user names a project of theirs as the model, it reads that project first and its choices
+win over the baseline, each recorded as a decision.
+
 **The delivery loop.** The generated `CLAUDE.md` and engineering-practices document both carry one
 loop, so a human and an agent run the same one:
 
-```
-  ┌─ pick the next task from the current milestone
-  ├─ worktree    wt switch --create <type>/<milestone>-<slug>
-  ├─ implement   the code AND its tests AND the docs it changes
-  ├─ gate        git push → .husky/pre-push runs ./scripts/ci.sh
-  ├─ open        gh pr create --base main --label goal:<milestone>
-  ├─ wait        gh pr checks --watch
-  ├─ merge       gh pr merge --squash
-  ├─ clean up    git fetch origin && wt remove && git push origin --delete <branch>
-  └─ next task ──┘
+```mermaid
+flowchart TD
+    pick["Pick the next task from the milestone"] --> worktree["Create its worktree"]
+    worktree --> implement["Implement the code, its tests and the docs it changes"]
+    implement --> gate{"Push: does scripts/ci.sh pass?"}
+    gate -->|red| fix["Fix the actual cause"]
+    fix --> gate
+    gate -->|red on the third attempt| human(["Label needs-human and stop"])
+    gate -->|green| open["Open the pull request"]
+    open --> checks{"Checks green and every auto-merge condition holds?"}
+    checks -->|a check is red| fix
+    checks -->|a condition fails| human
+    checks -->|yes| merge["Squash merge"]
+    merge --> cleanup["Remove the worktree and the branch"]
+    cleanup --> done{"Is the milestone Done when true?"}
+    done -->|no| pick
+    done -->|yes| report(["Update What exists today and report"])
 ```
 
+| Step | Command |
+|---|---|
+| worktree | `wt switch --create <type>/<milestone>-<slug>` |
+| gate | `git push`, whose pre-push hook runs `./scripts/ci.sh` |
+| open | `gh pr create --base main --fill --label goal:<milestone>` |
+| wait and merge | `gh pr merge --squash --auto` when the checks are hosted; `gh pr merge --squash` when they run locally only |
+| clean up | `git fetch --prune origin && wt remove` (the merge already deleted the remote branch) |
+
 Every task runs in its own [worktrunk](https://worktrunk.dev) worktree, made ready on creation by
-`.config/wt.toml` (install, env files, its own ports and database), so parallel tasks never share a
-working tree.
+`.config/wt.toml` (on web: install, env files, its own ports and database; on macos: install and
+the generated Xcode project), so parallel tasks never share a working tree.
 
 The gate runs before the pull request exists, so a red branch never becomes somebody's review.
 Three failed attempts on the same check means `needs-human` and stop. Deleting a test, loosening a
