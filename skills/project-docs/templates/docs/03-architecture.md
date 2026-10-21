@@ -1,4 +1,9 @@
-<!-- TEMPLATE. Spec: references/document-specs.md. Usually 400–1000 lines when finished. -->
+<!-- TEMPLATE. Spec: references/document-specs.md. Usually 400–1000 lines when finished.
+     These are the web sections. On macos, use the section list in document-specs.md, 03, macos:
+     targets and boundaries, the main path, scheduling, credentials, distribution, concurrency.
+     On cli, use document-specs.md, 03, cli: layers, the command tree, the command-line contract,
+     configuration precedence, distribution.
+     Diagrams in Mermaid: references/diagrams.md. -->
 # 03 — Architecture
 
 ## 1. The central idea: <the property everything else serves>
@@ -22,13 +27,15 @@ packages/
 | Package | May import | Must never import |
 |---|---|---|
 
+<!-- The graph as a Mermaid flowchart, an edge per allowed import. -->
+
 Enforced by <the lint rule>, with a message naming the rule and where it is written down. A
 violation fails a job; it is not a review comment.
 
 ## 4. The request path
 
 <!-- Middleware in its exact order, what each rejects and with what status, what reaches a
-     handler. A numbered list or a diagram. -->
+     handler. A numbered list or a Mermaid sequenceDiagram. -->
 
 ## 5. <The outbox | The queue>
 

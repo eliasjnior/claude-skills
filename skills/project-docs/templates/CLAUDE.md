@@ -35,7 +35,7 @@ describes the target rather than the tree, so check here before reaching for som
    or a locale file, never inline in a handler.>
 2. **Every change is a pull request.** `main` is protected. No direct pushes, not even from the
    maintainer, not even for a typo.
-3. **`packages/domain` performs no I/O.** No `fetch`, no database client, no `fs`, no
+3. **`packages/domain` performs no I/O.** <!-- macos: `<Name>Core` and the rules target. cli: `src/core`. --> No `fetch`, no database client, no `fs`, no
    `process.env`, no clock. Time and randomness arrive as arguments. Enforced by lint, not by
    discipline.
 4. **No mocking of our own modules.** Providers are replaced at the network edge.
@@ -52,11 +52,19 @@ describes the target rather than the tree, so check here before reaching for som
 
 ## Architecture in one screen
 
-```
-<ASCII diagram. One screen, literally.>
+```mermaid
+flowchart TD
+    %% One screen, literally. references/diagrams.md has the rules.
 ```
 
 ## Package boundaries
+
+<!-- macos: title this "Target boundaries". Enforced by SwiftPM's declared dependencies, plus
+     apps/macos/scripts/check-imports.sh for what the compiler cannot see. Rows are the
+     <Name>Kit targets; <Name>Core imports only Foundation.
+     cli: title this "Layers". Rows are core, commands, adapters, render, enforced by Biome's
+     rules on src/core/**. Add a "Command-line contract" section after it: stdout and stderr,
+     --json, the exit codes (references/stack-cli.md §3). -->
 
 Enforced by Biome's `noRestrictedImports`. A violation fails the `lint` job; it is not a review
 comment.
@@ -93,19 +101,32 @@ the first task of M0. Never guess a remote. -->
 
 One task in, one merged commit out. Repeat until the milestone's **Done when** is true.
 
+```mermaid
+flowchart TD
+    pick["Pick the next task from the milestone"] --> worktree["Create its worktree"]
+    worktree --> implement["Implement the code, its tests and the docs it changes"]
+    implement --> gate{"Push: does scripts/ci.sh pass?"}
+    gate -->|red| fix["Fix the actual cause"]
+    fix --> gate
+    gate -->|red on the third attempt| human(["Label needs-human and stop"])
+    gate -->|green| open["Open the pull request"]
+    open --> checks{"Checks green and every auto-merge condition holds?"}
+    checks -->|a check is red| fix
+    checks -->|a condition fails| human
+    checks -->|yes| merge["Squash merge"]
+    merge --> cleanup["Remove the worktree and the branch"]
+    cleanup --> done{"Is the milestone Done when true?"}
+    done -->|no| pick
+    done -->|yes| report(["Update What exists today and report"])
 ```
-  ┌─ pick the next task from the current milestone
-  │
-  ├─ worktree:    wt switch --create <type>/<milestone>-<slug>
-  ├─ implement:   the code AND its tests AND the docs it changes
-  ├─ gate:        git push  →  .husky/pre-push runs ./scripts/ci.sh
-  │                 └─ red? fix the cause and push again. Three attempts, then stop
-  ├─ open:        gh pr create --base main --fill --label goal:<milestone>
-  ├─ wait:        gh pr checks --watch
-  ├─ merge:       gh pr merge --squash
-  ├─ clean up:    git fetch origin && wt remove && git push origin --delete <branch>
-  └─ next task ───┘
-```
+
+| Step | Command |
+|---|---|
+| worktree | `wt switch --create <type>/<milestone>-<slug>` |
+| gate | `git push`, whose pre-push hook runs `./scripts/ci.sh` |
+| open | `gh pr create --base main --fill --label goal:<milestone>` |
+| wait and merge | `gh pr merge --squash --auto` when the checks are hosted; `gh pr merge --squash` when they run locally only |
+| clean up | `git fetch --prune origin && wt remove` (the merge already deleted the remote branch) |
 
 The gate runs **before** the pull request exists, so a red branch never becomes somebody's review.
 
@@ -127,6 +148,8 @@ workflows, infrastructure or deployment config, migrations with destructive DDL,
 holding secrets; no public type in `packages/domain` changed; no decision-recording document in
 `docs/` changed; the diff is within the size budget. If any condition fails: apply `needs-human`,
 write why in a comment, and stop. Do not work around the condition.
+<!-- macos: add signing, entitlements, bundle id and persisted formats; cli: add no command, flag,
+     --json field or exit code removed or renamed. Name the pure package of the profile. -->
 
 **When a check fails:** read the failing job, fix the actual cause, push. Three attempts maximum,
 then label `needs-human`, write down what was tried, and stop. Never "fix" a check by deleting a
@@ -140,6 +163,12 @@ When a milestone's **Done when** becomes true, update the "What exists today" ta
 same pull request as the last task of that milestone.
 
 ## Local development
+
+<!-- macos: `make bootstrap`, `pnpm install`, `make gen build`; then that the .xcodeproj is
+     generated, that two worktrees' Debug builds must not run at once, and a "Checking UI" section
+     on the `--snapshot <directory>` mode (references/root-files.md).
+     cli: `pnpm install`, `pnpm build`, running the built tool with XDG_CONFIG_HOME pointed at a
+     scratch directory, and `UPDATE_GOLDEN=1` for the end-to-end golden files. -->
 
 ```bash
 corepack enable

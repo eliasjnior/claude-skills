@@ -57,9 +57,10 @@ Not "the system matches requests to agencies" but the actual rule, the actual or
 tie-break, with worked examples. Not "good performance" but `p99 < 500ms`. Not "small PRs" but
 "under ~400 changed lines, excluding lockfiles, generated migrations and snapshots".
 
-Where a shape is easier to see than to read, draw it — ASCII before/after diagrams, message
-mockups over time, request paths. The reference set uses these heavily and they carry more than the
-paragraphs around them.
+Where a shape is easier to see than to read, draw it — before/after diagrams, request paths,
+state machines, boundary graphs, as Mermaid (`references/diagrams.md`); message mockups over time
+as plain text, because they show what a person sees. The reference set uses these heavily and they
+carry more than the paragraphs around them.
 
 ## 6. Say the uncomfortable thing out loud
 
@@ -126,3 +127,4 @@ an empty "Observability" heading is worse than no heading, because it reads as a
 | Two documents explaining the same mechanism | A scope boundary is wrong. |
 | A roadmap milestone with no "Done when" | It is a heading, not a milestone. |
 | No bad news anywhere | Rule 6 was skipped. |
+| A flow drawn with `─`, `│`, `▶` or `-->` in a plain code block | It should be Mermaid. `references/diagrams.md` |
