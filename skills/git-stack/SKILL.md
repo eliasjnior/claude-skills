@@ -1,7 +1,7 @@
 ---
 name: git-stack
-description: Split the current branch into a stack of smaller draft PRs managed by gh stack.
-argument-hint: "[jira-ticket] [extra context]"
+description: Split the current branch into a stack of smaller draft PRs managed by gh stack, or change an existing stack (remove a part, mark it ready, turn it back to draft).
+argument-hint: "[jira-ticket] [extra context] | remove <part> | ready [parts] | draft"
 model: sonnet
 disable-model-invocation: true
 allowed-tools:
@@ -99,17 +99,28 @@ You are a Pull Request splitting assistant. Take the work on the current branch 
 - PRs already exist but are not linked as a stack (a previous split that only chained base branches): `gh stack link --base <trunk> <branch-1> <branch-2> …` links them on GitHub without local tracking.
 - Wrong order or wrong parts after the stack exists: there is no non-interactive reorder. `gh stack unstack` (removes local tracking and the GitHub grouping, keeps branches and PRs), fix the branches, then `gh stack init --base <trunk> <branch-1> …` again.
 
+**Changing an existing stack** (when the user asks to remove a part or change the stack's status; `gh stack modify` is interactive, so use these instead)
+- Removing a part: first decide with the user whether its changes are **discarded** or **folded** into a neighbour, since the commands differ.
+  1. `gh stack unstack` — removes the GitHub grouping and local tracking, keeps branches and PRs.
+  2. Rewrite the branches. Discarding a middle or bottom part: `git rebase --update-refs --onto <part-below> <removed-part> <top-part>`, where `<part-below>` is the trunk when the bottom part is removed. `--update-refs` moves every part branch between them in the same pass. Do not use `gh stack rebase` for this, since it would replay the removed commits onto the parts above. Discarding the top part needs no rebase. Folding into the part above needs no rebase either, since that branch already contains the removed commits. Folding into the part below: `git checkout <part-below> && git merge --ff-only <removed-part>`.
+  3. `gh stack init --base <trunk> <remaining branches, bottom to top>`, then `gh stack submit --auto` to push the rewritten branches, retarget the PR bases, and recreate the stack.
+  4. The removed part's PR is still open. Ask the user before closing it: `gh pr close <number> --delete-branch` (closes the PR and deletes the remote and local branch).
+  5. Renumber the `(part N/M)` suffixes of the remaining PR titles with `gh pr edit <number> --title …`.
+- Marking ready for review: `gh stack submit --auto --open` marks every PR of the stack ready. To mark only some, use `gh pr ready <number>` per PR, bottom up: a PR can only merge together with every PR below it (see Merging), so a ready part above a draft one cannot land yet.
+- Back to draft: `gh stack` has no command for it. List the PRs with `gh stack view --json` and run `gh pr ready --undo <number>` on each. Converting to draft depends on the repository's plan; if GitHub rejects it, report that and stop.
+
 **Hand-off notes for the user** (include the relevant ones in the report):
 - Review feedback on a middle part: `gh stack down` to that branch, commit the fix, then `gh stack rebase --upstack` to cascade it through the branches above, and `gh stack submit --auto` to update the PRs.
 - Merging: `gh stack merge <pr-number>` (add `--yes` to skip the prompt, and `--squash`/`--merge`/`--rebase` to pick the method) or the Merge button on the highest PR you want to land — that PR and every unmerged PR below it merge together, all or nothing. Layers cannot be skipped. `gh pr merge` cannot merge a stack. Drafts must be marked ready first.
 - After something lands: `gh stack sync --prune` fetches, rebases the rest of the stack (squash merges included), pushes, and deletes the merged local branches.
-- Restructuring (drop, fold, reorder, rename parts): `gh stack modify`, then `gh stack submit`. Interactive, so the user runs it.
+- Restructuring (drop, fold, reorder, rename parts): `gh stack modify`, then `gh stack submit`. Interactive, so the user runs it; to have it done instead, ask for it (see Changing an existing stack).
 - Navigation and status: `gh stack view` (`--short`, `--json`), `up`/`down`/`top`/`bottom`, `switch` for a picker.
-- Marking the parts ready for review: `gh stack submit --open`, or per PR with `gh pr ready <number>`.
+- Marking the parts ready for review: `gh stack submit --auto --open`, or per PR with `gh pr ready <number>`. Back to draft: `gh pr ready --undo <number>` per PR.
 
 **PR title**: conventional format with the part suffix, e.g. `feat: Add user authentication (part 1/3)`.
 
 **PR description**: follow `${CLAUDE_SKILL_DIR}/../git-pr/references/pr-template.md`, and add a `## Stack overview` section right after `## Summary` in **every** PR of the stack. It describes what the stack as a whole implements (the overall feature and its purpose, in a short paragraph), so a reviewer opening any single part understands the bigger picture. Write it once and use the same text in every PR; `## Summary` and the other sections stay specific to that part. Do NOT list or link the other PRs in it (no checklist of parts): GitHub renders the stack navigation automatically on every PR of the stack.
 
 **Arguments**: `$ARGUMENTS`
+- If the arguments ask to change an existing stack (remove or fold a part, mark parts ready, turn the stack back to draft), skip the split steps and follow **Changing an existing stack** on the stack of the current branch. The rules above about splitting do not apply, except that `--no-verify` is still never passed.
 - If the first argument looks like a Jira ticket (e.g. `PROJ-123`), use it as the ticket. Anything else is extra context.
