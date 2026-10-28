@@ -36,7 +36,7 @@ As a plugin, if you prefer that:
 | [`git-worktree`](skills/git-worktree) | Creates a [worktrunk](https://worktrunk.dev) worktree for a task and moves the session into it, runs several tasks in parallel worktrees, lists them, and cleans up the ones whose PR was merged | `/git-worktree [list\|clean\|exit] [jira] [-- task]` | default |
 | [`git-worktree-describe`](skills/git-worktree-describe) | Sets or updates the one-line description and Jira ticket of a worktree's branch, from your text or from what the branch changed | `/git-worktree-describe [branch\|all] [jira] [-- text]` | haiku |
 | [`git-worktree-setup`](skills/git-worktree-setup) | Prepares the current repository for worktrees: `.config/wt.toml` hooks for dependencies, env files, per-worktree ports and database, verified with a throwaway worktree | `/git-worktree-setup [context]` | default |
-| [`git-stack`](skills/git-stack) | Splits the current branch into a stack of draft PRs with [`gh stack`](https://gh.io/stacks), about 200 changed lines per part | `/git-stack [jira] [context]` | sonnet |
+| [`git-stack`](skills/git-stack) | Splits the current branch into a stack of draft PRs with [`gh stack`](https://gh.io/stacks), about 200 changed lines per part, and changes an existing stack: drops or folds a part, marks it ready or back to draft | `/git-stack [jira] [context]`, `/git-stack remove <part>\|ready [parts]\|draft` | sonnet |
 | [`project-docs`](skills/project-docs) | Writes a full project plan and documentation set from a project description | `/project-docs <description>` | default |
 
 Installed as a plugin, the skills are namespaced: `/claude-skills:git-commit`. The short name
@@ -66,7 +66,9 @@ working tree to reviewable pull requests.
   200 changed lines that each build and pass checks on their own, and asks once for approval per
   part. It then builds the stack with `gh stack`, rewriting commits where that makes the parts
   cleaner, verifies every commit and that the parts add up to the original tree, and submits
-  draft PRs that share a stack overview. The original branch is deleted at the end.
+  draft PRs that share a stack overview. The original branch is deleted at the end. On an
+  existing stack, `/git-stack remove <part>`, `ready [parts]` and `draft` drop or fold a part
+  and switch the PRs between draft and ready for review, without the interactive `gh stack modify`.
 
 ### Worktrees
 
