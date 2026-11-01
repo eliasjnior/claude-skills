@@ -38,6 +38,7 @@ As a plugin, if you prefer that:
 | [`git-worktree-setup`](skills/git-worktree-setup) | Prepares the current repository for worktrees: `.config/wt.toml` hooks for dependencies, env files, per-worktree ports and database, verified with a throwaway worktree | `/git-worktree-setup [context]` | default |
 | [`git-stack`](skills/git-stack) | Splits the current branch into a stack of draft PRs with [`gh stack`](https://gh.io/stacks), about 200 changed lines per part, and changes an existing stack: drops or folds a part, marks it ready or back to draft | `/git-stack [jira] [context]`, `/git-stack remove <part>\|ready [parts]\|draft` | sonnet |
 | [`project-docs`](skills/project-docs) | Writes a full project plan and documentation set from a project description | `/project-docs <description>` | default |
+| [`tldr`](skills/tldr) | Summarizes a project, plan, PR, diff, issue, document, URL, thread, log or the conversation: the answer first, then what changes your next action, then what it read | `/tldr [short] [target] [-- focus]` | default |
 
 Installed as a plugin, the skills are namespaced: `/claude-skills:git-commit`. The short name
 works too while no other skill shares it.
@@ -122,9 +123,10 @@ the commit or PR. The commit format and the PR template live once, in
 `skills/git-commit/references/` and `skills/git-pr/references/`, and the other skills read them from
 there, so the skills are meant to be installed together.
 
-Only `git-commit`, `git-worktree` and `git-worktree-describe` can be triggered by Claude on its own
-("commit this", "abre uma worktree pra isso", "atualiza a descrição dessa worktree"). The others push, open PRs, rename remote branches or write configuration,
-so they run only when typed.
+Only `git-commit`, `git-worktree`, `git-worktree-describe`, `project-docs` and `tldr` can be triggered
+by Claude on its own ("commit this", "abre uma worktree pra isso", "atualiza a descrição dessa
+worktree", "plan this project", "resume esse PR"). The others push, open PRs, rename remote branches
+or write configuration, so they run only when typed.
 
 Requirements: the [GitHub CLI](https://cli.github.com) (`gh`), plus the `gh stack` extension for
 `git-stack` (`gh extension install github/gh-stack`), and the Atlassian MCP server only for the Jira
@@ -140,6 +142,15 @@ integration.
   deleted on merge, hosted unit, integration and end-to-end checks), and decides only the slots that
   genuinely vary per project. [`skills/project-docs/README.md`](skills/project-docs/README.md)
   has the document set, the stack and the loop.
+
+### Summaries
+
+- **`tldr`** summarizes whatever you point it at, or what the conversation is on, in under 150
+  words: one line that stands alone, up to five ranked bullets, a warning when something needs you,
+  and what it read. It checks claims against the source, so a PR description that disagrees with
+  its diff gets reported. It only reads, and Claude can trigger it on its own ("resume esse PR",
+  "tldr do plano"). `short` returns the first line alone; `-- focus` picks what to keep by a
+  question.
 
 ## Adding a skill
 
