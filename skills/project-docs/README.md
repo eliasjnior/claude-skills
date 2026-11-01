@@ -100,7 +100,7 @@ flowchart TD
 |---|---|
 | worktree | `wt switch --create <type>/<milestone>-<slug>` |
 | gate | `git push`, whose pre-push hook runs `./scripts/ci.sh` |
-| open | `gh pr create --base main --fill --label goal:<milestone>` |
+| open | `gh pr create --base main --label goal:<milestone> --title "<type>(<scope>): <subject>" --body "<the four sections>"` |
 | wait and merge | `gh pr merge --squash --auto` when the checks are hosted; `gh pr merge --squash` when they run locally only |
 | clean up | `git fetch --prune origin && wt remove` (the merge already deleted the remote branch) |
 
