@@ -131,12 +131,12 @@ Mandatory. Check, and fix what fails:
 
 The profile's baseline file, §9, has the actual toolchain files the documents promise. **web**
 (`references/stack-baseline.md`): `package.json`, `pnpm-workspace.yaml`, `turbo.json`, `biome.json`
-with the boundary rules, `tsconfig.base.json`, `commitlint.config.js`, and `.config/wt.toml` with
+with the boundary rules, `tsconfig.base.json`, `commitlint.config.js`, and `scripts/worktree-setup.sh` with
 `.worktreeinclude`; `references/workflow.md` §4 has `scripts/ci.sh` and the hooks that run it.
 **macos** (`references/stack-macos.md`): `project.yml`, `Package.swift`, the `Makefile`,
-`lefthook.yml`, the `Brewfile`, `scripts/ci.sh`, `check-imports.sh` and `.config/wt.toml`.
+`lefthook.yml`, the `Brewfile`, `scripts/ci.sh`, `check-imports.sh` and `scripts/worktree-setup.sh`.
 **cli** (`references/stack-cli.md`): `package.json`, `tsdown.config.ts`, `src/cli.ts`,
-`scripts/ci.sh` and `.config/wt.toml`, with the web baseline's TypeScript, Biome and commitlint
+`scripts/ci.sh` and `scripts/worktree-setup.sh`, with the web baseline's TypeScript, Biome and commitlint
 files. **Every profile** (`references/repository.md`): `.github/workflows/ci.yml`,
 `.github/dependabot.yml`, `.github/pull_request_template.md` and `scripts/configure-repo.sh`.
 Never run `configure-repo.sh` yourself: it changes a live repository, so it is the user's step.
@@ -147,7 +147,7 @@ Emit the files only if the user asks for a scaffold; the default deliverable is 
 When the user asks you to implement the plan rather than only write it, **read
 `references/workflow.md` and run the loop it specifies**, one task at a time:
 
-> worktree (`wt switch --create`) → implement code, tests and the documents the change touches →
+> worktree (`git worktree add`, then `scripts/worktree-setup.sh`) → implement code, tests and the documents the change touches →
 > push, which runs `scripts/ci.sh` through the pre-push hook → wait for it green → `gh pr create`
 > against the repository named in `CLAUDE.md` → `gh pr merge --squash --auto` once the auto-merge
 > conditions hold → prune and remove the worktree → next task

@@ -39,11 +39,11 @@ flowchart TD
 
 | Step | Command |
 |---|---|
-| worktree | `wt switch --create <type>/<milestone>-<slug>` |
+| worktree | `git worktree add -b <type>/<milestone>-<slug> ../<repo>.<slug> main && ../<repo>.<slug>/scripts/worktree-setup.sh` |
 | gate | `git push`, whose pre-push hook runs `./scripts/ci.sh` |
 | open | `gh pr create --base main --fill --label goal:<milestone>` |
 | wait and merge | `gh pr merge --squash --auto` when the checks are hosted; `gh pr merge --squash` when they run locally only |
-| clean up | `git fetch --prune origin && wt remove` |
+| clean up | from the primary checkout, `git fetch --prune origin && git worktree remove ../<repo>.<slug> && git branch -D <type>/<milestone>-<slug>` |
 
 The pre-push hook is `.husky/pre-push` on the web profile and lefthook's `pre-push` on macos. Both
 run the same `./scripts/ci.sh`.
@@ -53,34 +53,33 @@ before the pull request exists**, so a red branch never becomes somebody's revie
 
 ### 1.1 One task, one worktree
 
-Every task gets its own worktree, created with [worktrunk](https://worktrunk.dev) (`wt`). The
-primary checkout stays on `main` and clean, two tasks never share a working tree, and several
-tasks can run at once, one agent per worktree, without stepping on each other.
+Every task gets its own worktree, created with
+[`git worktree add`](https://git-scm.com/docs/git-worktree). The primary checkout stays on `main`
+and clean, two tasks never share a working tree, and several tasks can run at once, one agent per worktree, without stepping on each other.
 
-What makes a worktree usable the moment it exists lives in `.config/wt.toml`, versioned with the
+What makes a new worktree usable lives in `scripts/worktree-setup.sh`, versioned with the
 code (§9 of the profile's baseline file has it): the install, which also writes the git hooks,
 so the gate exists in every worktree. On web, also the env files, copied from the primary worktree
 through `.worktreeinclude`, and a dev-server port and a database name derived from the branch, so
 two worktrees never collide. On macos, the generated Xcode project instead, since it is never
 committed; build products stay inside the worktree, and the one thing two worktrees still share is
-the development build's bundle identifier. Nothing is copied by hand. Project hooks are shell commands from the
-repository, so `wt` runs them only once they are approved on the machine: `wt config approvals add`,
-once per clone and again whenever a hook changes. Without that, a non-interactive `wt switch
---create` (an agent's) stops at the approval prompt and creates nothing.
+the development build's bundle identifier. Nothing is copied by hand. `git worktree add` does not run the script by
+itself, so creating a worktree is always the two commands in the table above.
 
 Two commands are deliberately not in the loop:
 
-- **`wt merge`.** It merges into `main` locally, which skips the pull request, the review and the
+- **A local `git merge` into `main`.** It skips the pull request, the review and the
   hosted checks. Work leaves a worktree through a pull request and nothing else.
 - **`gh pr merge --delete-branch`.** It tries to check out `main` and delete the local branch,
   and inside a linked worktree that fails because `main` is checked out in the primary one. It is
   also redundant: the repository deletes the remote branch on merge (`references/repository.md`
-  §1), and `wt remove` deletes the worktree and the local branch once the fetch shows it as merged
-  (squash merges included).
+  §1), and the clean-up step deletes the worktree and the local branch.
 
-`wt remove` refuses a worktree with uncommitted changes and keeps a branch it cannot prove was
-merged. Both refusals are information, not obstacles: never answer them with `--force` or `-D`
-unless the pull request is merged and the leftover is understood.
+`git worktree remove` refuses a worktree with uncommitted changes. That refusal is information, not
+an obstacle: never answer it with `--force` unless the pull request is merged and the leftover is
+understood. A squash merge leaves the branch's commits outside `main`, so `git branch -d` refuses
+too: use `-D` only after `gh pr view --json state,headRefOid` shows the pull request `MERGED` with
+the same commit as the branch's tip.
 
 ## 2. Which repository
 
@@ -240,7 +239,8 @@ gh pr merge --squash
 
 # then, per §1.1. The remote branch was deleted by the merge.
 git fetch --prune origin
-wt remove                # the worktree, and the local branch now that main contains it
+git worktree remove ../<repo>.<slug>     # from the primary checkout; refuses uncommitted changes
+git branch -D <branch>                   # squash merged, so -d cannot see it in main
 ```
 
 Enable auto-merge only after the conditions below were checked: it merges without asking again.

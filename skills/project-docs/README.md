@@ -98,14 +98,14 @@ flowchart TD
 
 | Step | Command |
 |---|---|
-| worktree | `wt switch --create <type>/<milestone>-<slug>` |
+| worktree | `git worktree add -b <type>/<milestone>-<slug> ../<repo>.<slug> main && ../<repo>.<slug>/scripts/worktree-setup.sh` |
 | gate | `git push`, whose pre-push hook runs `./scripts/ci.sh` |
 | open | `gh pr create --base main --fill --label goal:<milestone>` |
 | wait and merge | `gh pr merge --squash --auto` when the checks are hosted; `gh pr merge --squash` when they run locally only |
-| clean up | `git fetch --prune origin && wt remove` (the merge already deleted the remote branch) |
+| clean up | from the primary checkout, `git fetch --prune origin && git worktree remove ../<repo>.<slug> && git branch -D <type>/<milestone>-<slug>` (the merge already deleted the remote branch) |
 
-Every task runs in its own [worktrunk](https://worktrunk.dev) worktree, made ready on creation by
-`.config/wt.toml` (on web: install, env files, its own ports and database; on macos: install and
+Every task runs in its own [git worktree](https://git-scm.com/docs/git-worktree), made ready by
+`scripts/worktree-setup.sh` (on web: install, env files, its own ports and database; on macos: install and
 the generated Xcode project), so parallel tasks never share a working tree.
 
 The gate runs before the pull request exists, so a red branch never becomes somebody's review.

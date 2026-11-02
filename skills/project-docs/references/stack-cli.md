@@ -11,7 +11,7 @@ document that the reasoning is what should not drift.
 
 From the web baseline (`references/stack-baseline.md`) this profile keeps, unchanged: TypeScript
 `strict` with the same compiler flags, Node ≥ 22, pnpm through corepack, Biome with boundary rules,
-Zod at every edge, Vitest, Husky with lint-staged, commitlint, gitleaks, worktrunk, hand-written
+Zod at every edge, Vitest, Husky with lint-staged, commitlint, gitleaks, git worktrees, hand-written
 clients rather than vendor SDKs, and `scripts/ci.sh` as the one gate. What it drops: Postgres,
 Drizzle, an HTTP framework, Compose, Turborepo, everything about deployment.
 
@@ -61,7 +61,7 @@ Two properties, stated in `NN-stack.md`:
 | **@clack/prompts** | Prompts and a spinner, used only when stdin and stdout are a TTY (§3) |
 | **Zod** | The config file, every environment variable, every provider response |
 | **tsdown** | Bundles `src/cli.ts` into one ESM file in `dist/` with its shebang. **Every pure-JavaScript dependency is bundled**, so the published package's `dependencies` holds only native modules: installing it runs no third-party install script and resolves nothing at startup |
-| **Biome**, **Husky** + **lint-staged**, **commitlint**, **gitleaks**, **worktrunk**, **Vitest** | As on web |
+| **Biome**, **Husky** + **lint-staged**, **commitlint**, **gitleaks**, **git worktree**, **Vitest** | As on web |
 | **release-please** | The version, the changelog and the release pull request from Conventional Commits |
 | **npm trusted publishing** | The release workflow publishes through OIDC with provenance. There is no `NPM_TOKEN` secret to leak or rotate |
 
@@ -256,14 +256,16 @@ reporting and a skip printing its reason:
 | integration tests | `pnpm test:integration` | there is no `test/integration` yet |
 | end-to-end tests | `pnpm test:e2e` | there is no `test/e2e` yet, or `CI_FAST=1` |
 
-### `.config/wt.toml`
+### `scripts/worktree-setup.sh`
 
-```toml
-# Worktree lifecycle for worktrunk (`wt`). Every task runs in its own worktree.
+```bash
+#!/usr/bin/env bash
+# Makes this worktree ready to work in. Run it after `git worktree add`; safe to run again.
+set -euo pipefail
+cd "$(dirname "$0")/.."
 
-[[pre-start]]
 # Dependencies, and the git hooks husky writes during install, so the push gate exists here too
-install = "pnpm install --frozen-lockfile"
+pnpm install --frozen-lockfile
 ```
 
 A CLI has no ports and no database, so a worktree needs nothing else. Its tests write only to the
