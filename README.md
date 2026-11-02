@@ -37,6 +37,7 @@ As a plugin, if you prefer that:
 | [`git-worktree-describe`](skills/git-worktree-describe) | Sets or updates the one-line description and Jira ticket of a worktree's branch, from your text or from what the branch changed | `/git-worktree-describe [branch\|all] [jira] [-- text]` | haiku |
 | [`git-worktree-setup`](skills/git-worktree-setup) | Prepares the current repository for worktrees: `scripts/worktree-setup.sh` for dependencies, env files, per-worktree ports and database, verified with a throwaway worktree | `/git-worktree-setup [context]` | default |
 | [`git-stack`](skills/git-stack) | Splits the current branch into a stack of draft PRs with [`gh stack`](https://gh.io/stacks), about 200 changed lines per part, and changes an existing stack: drops or folds a part, marks it ready or back to draft | `/git-stack [jira] [context]`, `/git-stack remove <part>\|ready [parts]\|draft` | sonnet |
+| [`report`](skills/report) | Builds my daily or weekly work report for the current repository from merged PRs, open PRs and worktrees, grouped into Merged, In review and In progress | `/report daily\|weekly [--current] [reviews] [-- other work]` | sonnet |
 | [`project-docs`](skills/project-docs) | Writes a full project plan and documentation set from a project description | `/project-docs <description>` | default |
 
 Installed as a plugin, the skills are namespaced: `/claude-skills:git-commit`. The short name
@@ -113,6 +114,16 @@ so they run only when typed.
 Requirements: the [GitHub CLI](https://cli.github.com) (`gh`), plus the `gh stack` extension for
 `git-stack` (`gh extension install github/gh-stack`), and the Atlassian MCP server only for the Jira
 integration.
+
+### Reporting
+
+- **`report`** collects my merged PRs, my open PRs with activity in the period and the work in
+  every worktree (commits, uncommitted and unpushed changes), attaches each worktree to its PR
+  when there is one, finds my commits on other people's PRs (marked as contributions), reads the PRs and diffs, and returns one Markdown list in English grouped
+  into **Merged**, **In review** and **In progress**, with the Jira key on each item. By default
+  it reports the previous, closed period: `daily` the previous business day (Friday on Monday),
+  `weekly` the previous Monday-to-Sunday week, plus a **Next** line. `--current` reports today or
+  this week until now instead. `reviews` adds the PRs I reviewed, and text after `--` (meetings, investigations, anything outside PRs) is summarized under **Other**. Read only.
 
 ### Planning
 
