@@ -59,11 +59,11 @@ flowchart TD
 
 | Step | Command |
 |---|---|
-| worktree | `wt switch --create <type>/<milestone>-<slug>` |
+| worktree | `git worktree add -b <type>/<milestone>-<slug> ../<repo>.<slug> main && ../<repo>.<slug>/scripts/worktree-setup.sh` |
 | gate | `git push`, whose pre-push hook runs `./scripts/ci.sh` |
 | open | `gh pr create --base main --fill --label goal:<milestone>` |
 | wait and merge | `gh pr merge --squash --auto` when the checks are hosted; `gh pr merge --squash` when they run locally only |
-| clean up | `git fetch --prune origin && wt remove` (the merge already deleted the remote branch) |
+| clean up | from the primary checkout, `git fetch --prune origin && git worktree remove ../<repo>.<slug> && git branch -D <type>/<milestone>-<slug>` (the merge already deleted the remote branch) |
 
 A task is done when three things are true, not one: the code, the tests for the layer it belongs
 to, and **the documents it changes, in the same pull request**. Documentation drift is the failure
@@ -141,13 +141,13 @@ milestone.
 
 ### 7.1 Worktrees
 
-<!-- From references/workflow.md §1.1. One task, one worktree, created with `wt switch --create`.
-     Then the `.config/wt.toml` hooks as a table — hook, what it runs, why — and what each
+<!-- From references/workflow.md §1.1. One task, one worktree, created with `git worktree add`.
+     Then the steps of `scripts/worktree-setup.sh` as a table — step, what it runs, why — and what each
      worktree gets of its own (macos: the generated project and its build directory, and the
      shared Debug bundle identifier as the sharp edge): the dev-server ports (hash_port of repo and branch), the database
      (sanitize_db of the branch, on the shared dev Postgres), and where both are written. Why the
      backing services are shared rather than per worktree. The two commands kept out of the loop,
-     `wt merge` and `gh pr merge --delete-branch`, each with its reason. What `wt remove` refuses,
+     a local merge into `main` and `gh pr merge --delete-branch`, each with its reason. What `git worktree remove` refuses,
      and that the database of a removed worktree is dropped by hand. -->
 
 ## 8. Environments

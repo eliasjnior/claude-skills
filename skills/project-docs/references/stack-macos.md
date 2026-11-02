@@ -10,7 +10,7 @@ project's own facts. Versions are the ones in use today; check for current ones 
 and say in the document that the reasoning is what should not drift.
 
 The parts of the web baseline that are not about the web still hold here: Conventional Commits
-with commitlint, the `D-xx` register, worktrunk, `scripts/ci.sh` as the one gate, hand-written
+with commitlint, the `D-xx` register, git worktrees, `scripts/ci.sh` as the one gate, hand-written
 clients rather than vendor SDKs, and "an absence is recorded". When the repository also has a web
 surface (a page the app bundles, a marketing site), `apps/web` follows
 `references/stack-baseline.md` and the two meet in §2's root toolchain.
@@ -76,7 +76,7 @@ Three properties come with the layout and are worth stating in `NN-stack.md`:
 | **gitleaks** | `pre-commit` over staged files and a CI job over history. A Mac app handles tokens, account names and personal identifiers, and the repository may become public |
 | **Homebrew `Brewfile`** | `make bootstrap` installs XcodeGen, SwiftLint and gitleaks, so a new machine is one command |
 | **release-please** | Version, changelog and tag per app (`macos-vX.Y.Z`). The version lives in `Config/Version.xcconfig`, `version.txt` and `apps/macos/package.json` and never in `project.yml`, so a release pull request does not trigger the macOS build |
-| **worktrunk** (`wt`) | One worktree per task, `.config/wt.toml` in §9 |
+| **git worktree** | One worktree per task, `scripts/worktree-setup.sh` in §9 |
 
 Two conventions that cost nothing and pay for themselves:
 
@@ -433,23 +433,21 @@ exit $status
 Name every adapter target in the second pattern, including the ones that do not exist yet. The
 rule then bites the moment one is created.
 
-### `.config/wt.toml`
+### `scripts/worktree-setup.sh`
 
 No ports and no database: what makes a worktree ready here is the hooks and the generated project.
 
-```toml
-# Worktree lifecycle for worktrunk (`wt`). Every task runs in its own worktree.
+```bash
+#!/usr/bin/env bash
+# Makes this worktree ready to work in. Run it after `git worktree add`; safe to run again.
+set -euo pipefail
+cd "$(dirname "$0")/.."
 
-[[pre-start]]
 # The JavaScript tools and, through `prepare`, the git hooks, so the gate exists here too
-install = "pnpm install --frozen-lockfile"
+pnpm install --frozen-lockfile
 
-[[pre-start]]
 # The .xcodeproj is generated, never committed, so a fresh worktree has none
-gen = "make -C apps/macos gen"
-
-[aliases]
-build = "make -C apps/macos build"
+make -C apps/macos gen
 ```
 
 Build products land in `apps/macos/build`, inside the worktree, so two worktrees never share

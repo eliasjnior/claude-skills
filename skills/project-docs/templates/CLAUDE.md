@@ -122,18 +122,18 @@ flowchart TD
 
 | Step | Command |
 |---|---|
-| worktree | `wt switch --create <type>/<milestone>-<slug>` |
+| worktree | `git worktree add -b <type>/<milestone>-<slug> ../<repo>.<slug> main && ../<repo>.<slug>/scripts/worktree-setup.sh` |
 | gate | `git push`, whose pre-push hook runs `./scripts/ci.sh` |
 | open | `gh pr create --base main --fill --label goal:<milestone>` |
 | wait and merge | `gh pr merge --squash --auto` when the checks are hosted; `gh pr merge --squash` when they run locally only |
-| clean up | `git fetch --prune origin && wt remove` (the merge already deleted the remote branch) |
+| clean up | from the primary checkout, `git fetch --prune origin && git worktree remove ../<repo>.<slug> && git branch -D <type>/<milestone>-<slug>` (the merge already deleted the remote branch) |
 
 The gate runs **before** the pull request exists, so a red branch never becomes somebody's review.
 
-- **One task, one worktree.** The primary checkout stays on `main`. Never `wt merge` (it merges
-  locally and skips the pull request), and never `gh pr merge --delete-branch` (it fails inside a
-  linked worktree; the clean-up step does its job). Never answer a `wt remove` refusal with
-  `--force` or `-D` unless the pull request is merged.
+- **One task, one worktree.** The primary checkout stays on `main`. Never merge into `main` locally
+  (it skips the pull request), and never `gh pr merge --delete-branch` (it fails inside a
+  linked worktree; the clean-up step does its job). Never answer a `git worktree remove` refusal
+  with `--force`, or delete a branch with `-D`, unless the pull request is merged.
 
 - **Branches:** `feat/m2-<slug>`, `fix/<slug>`. The milestone prefix ties the branch to the roadmap.
 - **Commits and PR titles:** Conventional Commits, scope is the workspace package. Squash merge
@@ -176,10 +176,12 @@ pnpm install
 pnpm dev
 ```
 
-Every task runs in its own worktree: `wt switch --create <branch>`. The hooks in
-`.config/wt.toml` install dependencies (and with them the git hooks), copy the env files listed in
-`.worktreeinclude`, and give the worktree its own ports and database. Nothing is copied by hand.
-`wt list` shows every worktree with its dev-server URL; `wt dev` starts this one's.
+Every task runs in its own worktree: `git worktree add -b <branch> ../<repo>.<slug> main`, then
+`scripts/worktree-setup.sh` inside it. The script installs dependencies (and with them the git
+hooks), copies the env files listed in `.worktreeinclude`, and gives the worktree its own ports and
+database. Nothing is copied by hand.
+`git worktree list` shows every worktree; this one's ports are in `.env.worktree`, and `pnpm dev`
+starts its dev servers.
 
 <!-- Then the surprising parts: why processes do not run in containers locally, what the dev script
 writes and when it refuses to, which ports and database this worktree got and where they are

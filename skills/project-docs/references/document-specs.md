@@ -228,7 +228,7 @@ project; do not soften the gates. In particular this document must state, unambi
   and the documents the change touches → push, which runs the gate → open the pull request → wait →
   squash merge → remove the worktree and the branch → next task. One task in, one merged commit
   out.
-- **How worktrees coexist**, from `workflow.md` §1.1: what the `.config/wt.toml` hooks do, what
+- **How worktrees coexist**, from `workflow.md` §1.1: what `scripts/worktree-setup.sh` does, what
   each worktree gets of its own, and the two commands kept out of the loop.
 - **Which repository** pull requests are opened against, that `main` is protected and is the
   only merge target, and **what protected means**: the settings and the ruleset from
