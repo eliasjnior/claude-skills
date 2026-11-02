@@ -33,9 +33,9 @@ As a plugin, if you prefer that:
 | [`git-pr`](skills/git-pr) | Commits pending work, renames the branch to the project's pattern, pushes, and opens a pre-filled PR in the browser for you to submit, or creates it directly with `--create` / as a draft with `--draft` | `/git-pr [--create\|--draft] [jira] [context]` | haiku |
 | [`git-pr-fix`](skills/git-pr-fix) | Triages the open review threads on a PR, asks which to address, and applies the approved ones without committing | `/git-pr-fix [pr] [context]` | default, high effort |
 | [`git-rename-branch`](skills/git-rename-branch) | Detects the project's branch naming pattern and renames the current branch to match, falling back to `<user>/<summary>` | `/git-rename-branch [jira] [context]` | haiku |
-| [`git-worktree`](skills/git-worktree) | Creates a [worktrunk](https://worktrunk.dev) worktree for a task and moves the session into it, runs several tasks in parallel worktrees, lists them, and cleans up the ones whose PR was merged | `/git-worktree [list\|clean\|exit] [jira] [-- task]` | default |
+| [`git-worktree`](skills/git-worktree) | Creates a git worktree for a task and moves the session into it, runs several tasks in parallel worktrees, lists them, and cleans up the ones whose PR was merged | `/git-worktree [list\|clean\|exit] [jira] [-- task]` | default |
 | [`git-worktree-describe`](skills/git-worktree-describe) | Sets or updates the one-line description and Jira ticket of a worktree's branch, from your text or from what the branch changed | `/git-worktree-describe [branch\|all] [jira] [-- text]` | haiku |
-| [`git-worktree-setup`](skills/git-worktree-setup) | Prepares the current repository for worktrees: `.config/wt.toml` hooks for dependencies, env files, per-worktree ports and database, verified with a throwaway worktree | `/git-worktree-setup [context]` | default |
+| [`git-worktree-setup`](skills/git-worktree-setup) | Prepares the current repository for worktrees: `scripts/worktree-setup.sh` for dependencies, env files, per-worktree ports and database, verified with a throwaway worktree | `/git-worktree-setup [context]` | default |
 | [`git-stack`](skills/git-stack) | Splits the current branch into a stack of draft PRs with [`gh stack`](https://gh.io/stacks), about 200 changed lines per part, and changes an existing stack: drops or folds a part, marks it ready or back to draft | `/git-stack [jira] [context]`, `/git-stack remove <part>\|ready [parts]\|draft` | sonnet |
 | [`project-docs`](skills/project-docs) | Writes a full project plan and documentation set from a project description | `/project-docs <description>` | default |
 
@@ -72,50 +72,34 @@ working tree to reviewable pull requests.
 
 ### Worktrees
 
-`git-worktree` and `git-worktree-setup` put every task in its own worktree, managed by
-[worktrunk](https://worktrunk.dev) (`wt`), so the primary checkout stays on the default branch and
+`git-worktree` and `git-worktree-setup` put every task in its own
+[git worktree](https://git-scm.com/docs/git-worktree), so the primary checkout stays on the default branch and
 parallel tasks never share a working tree.
 
 - **`git-worktree-setup`** runs once per repository. It reads the lockfile, the gitignored files a
   fresh checkout lacks, and the values that would collide between checkouts (ports, database
-  names, Compose host ports), then writes `.config/wt.toml` and `.worktreeinclude` so a new
-  worktree is ready the moment `wt switch --create` returns. It asks once, verifies everything in
+  names, Compose host ports), then writes `scripts/worktree-setup.sh` and `.worktreeinclude`, so a new
+  worktree is ready with one command after `git worktree add`. It asks once, verifies everything in
   a throwaway worktree, and leaves the changes for `/git-commit`.
 - **`git-worktree`** names the branch with `git-rename-branch`'s rules, bases it on an up-to-date
   default branch, and moves the session into the new worktree; with `-- task` it starts on the
   task right away. For several tasks at once it creates one worktree each and runs a subagent per
-  worktree, or prints the `wt switch <branch> -x claude` commands for separate sessions. `clean`
+  worktree, or prints the `cd <path> && claude` commands for separate sessions. `clean`
   removes the worktrees whose PR was merged, after asking. Work leaves a worktree through
-  `/git-pr`, never through `wt merge`. Every worktree it creates gets a one-line description.
+  `/git-pr`, never through a local merge. Every worktree it creates gets a one-line description.
 - **`git-worktree-describe`** rewrites that description, or the ticket, when the work moves on;
   `all` describes every worktree that has none, from its commits and diff.
-- **`/git-worktree list`** prints `wt ls` when the user config defines that alias (a richer table
-  of PR state, description and path kept outside this repository), and `wt list --full` otherwise.
+- **`/git-worktree list`** builds a table of every worktree with its description, changes, PR state
+  and path.
 
-Requirements: `wt` with its shell integration (`wt config shell install`), and the worktrunk
-Claude Code plugin, whose `WorktreeCreate` hook lets the session enter a new worktree without a
-confirmation prompt. Worktrees live next to the repository by default (`../<repo>.<branch>`), so
-the parent directory belongs in Claude Code's `permissions.additionalDirectories`.
+Requirements: git and `gh`. Worktrees live next to the repository by default
+(`../<repo>.<branch>`), so the parent directory belongs in Claude Code's
+`permissions.additionalDirectories`. A project that already uses a manager on top of git worktrees,
+such as [worktrunk](https://worktrunk.dev) with its `.config/wt.toml`, keeps using it: the skills
+go through that tool when it is installed, because its hooks only run that way.
 
 `git-worktree` writes what each worktree is for into the branch's git config (`description`, and
-`jira` when there is a ticket). Two custom columns in `~/.config/worktrunk/config.toml` put that
-into `wt list`:
-
-```toml
-[list]
-columns = ["branch", "status", "Summary", "Jira", "ci", "ahead-behind", "working-diff", "age", "message"]
-
-[list.custom-columns.Summary]
-template = "{{ git.branch.description | default('') | lines | first }}"
-width = 40
-
-[list.custom-columns.Jira]
-template = "{{ git.branch.jira | default('') }}"
-width = 12
-```
-
-Listing `ci` makes every `wt list` ask GitHub for PR and CI state (cached for 30 to 60 seconds).
-Leave it out of `columns` and use `wt list --full` when that is too slow.
+`jira` when there is a ticket), so it follows a branch rename and disappears with the branch.
 
 Skills that take a Jira ticket fetch it through the Atlassian MCP server and add the context to
 the commit or PR. The commit format and the PR template live once, in
