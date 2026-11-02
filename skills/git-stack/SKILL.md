@@ -77,7 +77,7 @@ You are a Pull Request splitting assistant. Take the work on the current branch 
    - `gh stack view --short` for the final state.
 
 8. **Drop the original branch**
-   - Only after step 6 passed and step 7 succeeded: `git branch -D <original-branch>`. The current worktree is on a part branch by now, so the original is checked out nowhere and git lets it go. If `git worktree list` still shows it in another worktree, leave that worktree and the branch alone and tell the user to run `wt remove <original-branch>` (or `/git-worktree clean`) once they are done with it.
+   - Only after step 6 passed and step 7 succeeded: `git branch -D <original-branch>`. The current worktree is on a part branch by now, so the original is checked out nowhere and git lets it go. If `git worktree list` still shows it in another worktree, leave that worktree and the branch alone and tell the user to run `/git-worktree clean` (or `git worktree remove <path>` and `git branch -D <original-branch>`) once they are done with it.
    - If the original branch exists on the remote and has **no** open PR: `git push origin --delete <original-branch>`.
    - If it has an open PR, leave the remote branch alone (deleting it would close the PR) and ask the user to close the PR manually.
    - End on the bottom branch of the stack (`gh stack bottom`).
