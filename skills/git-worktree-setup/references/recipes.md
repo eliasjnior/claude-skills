@@ -1,46 +1,60 @@
 # Worktree recipes
 
-Building blocks for `.config/wt.toml`. Pick per concern, adapt the commands to the project, and
-verify each one by hand first. The full reference is the worktrunk documentation
-(https://worktrunk.dev/hook/, https://worktrunk.dev/step/), also bundled with the worktrunk plugin.
+Building blocks for `scripts/worktree-setup.sh`. Pick per concern, adapt the commands to the
+project, and verify each one by hand first.
 
-## Which hook
+## The script
 
-| Hook | Runs | Use for |
-|---|---|---|
-| `pre-start` | once, on creation, blocking | what the first command in the worktree needs: dependencies, env files |
-| `post-start` | once, on creation, in the background | slow or optional work: cache copies, builds, dev servers |
-| `pre-remove` | before removal, inside the worktree | stopping what the worktree started |
-| `post-remove` | after removal, from the primary worktree | external cleanup |
+It runs inside a new worktree, right after `git worktree add`, and again whenever someone wants to
+bring the worktree back up to date, so every step is safe to repeat. Keep what the project uses and
+delete the rest.
 
-A table runs its commands concurrently. A list of tables (`[[pre-start]]`) is a pipeline: each
-step waits for the previous one.
+```bash
+#!/usr/bin/env bash
+# Makes this worktree ready to work in. Run it after `git worktree add`; safe to run again.
+set -euo pipefail
+cd "$(dirname "$0")/.."
 
-```toml
-# Concurrent
-[pre-start]
-install = "pnpm install --frozen-lockfile"
-env = "wt step copy-ignored"
+primary="$(git worktree list --porcelain | sed -n '1s/^worktree //p')"
+branch="$(git branch --show-current)"
+branch="${branch:-$(basename "$PWD")}"
+repo="$(basename "$primary")"
+
+# A stable port per name, so two worktrees never collide
+hash_port() { printf '%s' "$1" | cksum | awk '{ print 10000 + $1 % 50000 }'; }
+
+# A valid database name per branch. The hash keeps `a/b` and `a-b` apart
+sanitize_db() {
+  local name suffix
+  name="$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]' | tr -c 'a-z0-9' '_')"
+  suffix="$(printf '%s' "$1" | cksum | cut -d' ' -f1)"
+  printf '%s_%s' "${name:0:40}" "$suffix"
+}
+
+# The gitignored files listed in .worktreeinclude, copied from the primary worktree.
+# Existing files stay, so a second run keeps local edits
+if [ "$PWD" != "$(cd "$primary" && pwd)" ] && [ -f .worktreeinclude ]; then
+  git -C "$primary" ls-files -z --others --ignored --exclude-from="$PWD/.worktreeinclude" \
+    | { git -C "$primary" check-ignore -z --stdin || true; } \
+    | while IFS= read -r -d '' file; do
+        [ -e "$file" ] && continue
+        mkdir -p "$(dirname "$file")"
+        cp -c "$primary/$file" "$file" 2>/dev/null \
+          || cp --reflink=auto "$primary/$file" "$file" 2>/dev/null \
+          || cp "$primary/$file" "$file"
+      done
+fi
+
+# Dependencies, and the git hooks the install writes, so the push gate exists here too
+pnpm install --frozen-lockfile
 ```
 
-```toml
-# Sequential: copy first, so the install reuses what was copied
-[[pre-start]]
-copy = "wt step copy-ignored"
-
-[[pre-start]]
-install = "npm ci"
-```
-
-Templates: `{{ branch }}`, `{{ repo }}`, `{{ worktree_path }}`, `{{ primary_worktree_path }}`,
-`{{ default_branch }}`, `{{ vars.<key> }}`. Filters: `sanitize`, `sanitize_db`, `hash_port`. Values
-are shell-escaped automatically, so do not quote them.
+The two `cp` variants are reflinks on macOS and Linux: no extra disk until a file is modified.
 
 ## Files a new worktree needs
 
-`wt step copy-ignored` copies gitignored files from the primary worktree, with reflinks (no extra
-disk until modified). Always pair it with `.worktreeinclude`, an allowlist: a file is copied only
-when it is gitignored **and** matched there.
+`.worktreeinclude` is an allowlist: a file is copied only when it is gitignored **and** matched
+there. Claude Code reads the same file for the worktrees it creates.
 
 ```text
 # .worktreeinclude — gitignored files every new worktree needs
@@ -49,107 +63,86 @@ when it is gitignored **and** matched there.
 apps/*/.env
 ```
 
-Run it in `pre-start` when the install or the first command needs the files, in `post-start`
-otherwise. Env files holding per-worktree values (a port, a database URL) are copied and then
-rewritten in a later pipeline step; see **Ports** and **Database**.
+Copy before the install when the install or the first command needs the files. Keep values that
+differ per worktree out of the copied files; see **Ports** and **Database**.
 
 ## Dependencies, per stack
 
-| Stack | Hook | Notes |
+| Stack | Step | Notes |
 |---|---|---|
-| pnpm | `pre-start`: `pnpm install --frozen-lockfile` | The global store makes it fast; do not copy `node_modules/` |
-| npm / yarn | `[[pre-start]]` copy `node_modules/` (in `.worktreeinclude`), then `npm ci` / `yarn install --frozen-lockfile` | The copy turns a cold install into a verification |
-| bun | `pre-start`: `bun install --frozen-lockfile` | |
-| uv | `pre-start`: `uv sync` | Never copy `.venv/`: it holds absolute paths |
-| poetry | `pre-start`: `poetry install` | Same, with `virtualenvs.in-project` |
-| Ruby | `pre-start`: `bundle install` | |
-| Rust | `post-start`: copy `target/` | The first build reuses compiled dependencies |
+| pnpm | `pnpm install --frozen-lockfile` | The global store makes it fast; do not copy `node_modules/` |
+| npm / yarn | `node_modules/` in `.worktreeinclude`, then `npm ci` / `yarn install --frozen-lockfile` after the copy | The copy turns a cold install into a verification |
+| bun | `bun install --frozen-lockfile` | |
+| uv | `uv sync` | Never copy `.venv/`: it holds absolute paths |
+| poetry | `poetry install` | Same, with `virtualenvs.in-project` |
+| Ruby | `bundle install` | |
+| Rust | `target/` in `.worktreeinclude` | The first build reuses compiled dependencies |
 | Go | nothing | The module cache is global |
 
-Build caches (`.turbo/`, `.next/cache/`) go in `.worktreeinclude` and copy in `post-start`; they
-only save time.
+Build caches (`.turbo/`, `.next/cache/`) go in `.worktreeinclude`; they only save time.
 
 ## Ports
 
 One deterministic port per repository and branch, stable across machines. Prefixing the repository
-keeps two repositories with a branch of the same name apart.
+keeps two repositories with a branch of the same name apart. Write them to a file of their own,
+gitignored and loaded after `.env`, so the copied `.env` stays identical to the primary one and no
+loader has to pick between two values of the same key.
 
-```toml
-[list]
-# URL column in `wt list`, dimmed when nothing is listening
-url = "http://localhost:{{ (repo ~ '-' ~ branch) | hash_port }}"
-
-[aliases]
-# `wt dev` starts this worktree's dev server on its own port
-dev = "pnpm dev --port {{ (repo ~ '-' ~ branch) | hash_port }}"
+```bash
+# This worktree's own ports, so two dev servers never collide
+cat > .env.worktree <<EOF
+API_PORT=$(hash_port "$repo-api-$branch")
+WEB_PORT=$(hash_port "$repo-web-$branch")
+EOF
 ```
 
-When the app reads the port from an env file instead of a flag, write it after the copy:
+Check how the app loads env files. If it cannot load a second file, propose that change to the user
+rather than appending to a copied `.env`.
 
-```toml
-[[pre-start]]
-copy = "wt step copy-ignored"
-
-[[pre-start]]
-# This worktree's port, so two dev servers never collide
-port = "echo PORT={{ (repo ~ '-' ~ branch) | hash_port }} >> .env.local"
-```
-
-If the copied file already sets the key, appending leaves two values and which one wins depends on
-the env loader. Check the loader, or write the per-worktree values to a file of their own that the
-app also loads.
-
-Several services: hash a different string per service (`(repo ~ '-api-' ~ branch)`,
-`(repo ~ '-web-' ~ branch)`).
-
-Starting the server on creation, only when the user asked for it. `wt step tether` kills the whole
-process tree when the worktree is removed, so no `pre-remove` is needed:
-
-```toml
-[post-start]
-server = "wt step tether -- pnpm dev --port {{ (repo ~ '-' ~ branch) | hash_port }}"
-```
+Do not start the server from the script: it is one server per worktree nobody asked for, and it
+would outlive the worktree.
 
 ## Database
 
 Only when the project already runs a local database. Two options, lightest first.
 
-**A database per worktree on the shared local server.** Adapt the create and migrate commands:
+**A database per worktree on the shared local server.** Adapt the create and migrate commands. A
+stopped server is a warning, not a failed worktree: start it and run the script again.
 
-```toml
-[[pre-start]]
-# The database name and URL for this worktree, readable later with `wt config state vars get db_url`
-vars = "wt config state vars set db_name={{ branch | sanitize_db }} db_url=postgres://postgres:postgres@localhost:5432/{{ branch | sanitize_db }}"
+```bash
+# This worktree's own database. Created only when missing, so a second run keeps its data
+db="$(sanitize_db "$branch")"
+echo "DATABASE_URL=postgres://postgres:postgres@localhost:5432/$db" >> .env.worktree
 
-[[pre-start]]
-# Created only when missing, so recreating a worktree for the same branch keeps its data
-create = "psql -h localhost -U postgres -tAc \"SELECT 1 FROM pg_database WHERE datname = '{{ vars.db_name }}'\" | grep -q 1 || createdb -h localhost -U postgres {{ vars.db_name }}"
-
-[[pre-start]]
-url = "echo DATABASE_URL={{ vars.db_url }} >> .env.local"
-
-[[pre-start]]
-migrate = "pnpm db:migrate"
+if pg_isready -q -h localhost; then
+  psql -h localhost -U postgres -tAc "SELECT 1 FROM pg_database WHERE datname = '$db'" | grep -q 1 \
+    || createdb -h localhost -U postgres "$db"
+  pnpm db:migrate
+else
+  echo "Postgres is not running: start it and run this script again" >&2
+fi
 ```
 
-Dropping it on removal destroys data, so it is written only with explicit approval:
+The `>>` needs the `cat >` from **Ports** before it, so the file is rewritten on every run. Without
+ports, use `>` here.
 
-```toml
-[pre-remove]
-# Approved by the user: removing a worktree drops its database
-drop = "dropdb -h localhost -U postgres --if-exists {{ vars.db_name }}"
+Dropping it destroys data, so it is never in the script. It is a command for the user, after
+removing the worktree:
+
+```bash
+dropdb -h localhost -U postgres --if-exists <database>
 ```
 
-**A container per worktree**, when worktrees need different server versions or extensions: a
-`post-start` pipeline that sets `container` and `port` vars (`('db-' ~ branch) | hash_port`), then
-`docker run -d --rm --name {{ vars.container }} -p {{ vars.port }}:5432 …`, and a `pre-remove`
-`docker stop {{ vars.container }} 2>/dev/null || true`. `--rm` makes the stop also the cleanup.
+**A container per worktree**, when worktrees need different server versions or extensions: a step
+that runs `docker run -d --rm --name "db-$db" -p "$(hash_port "db-$branch"):5432" …` unless
+`docker ps -q -f name="^db-$db$"` already finds it, and `docker stop "db-$db"` as a command for the
+user after removing the worktree. `--rm` makes the stop also the cleanup.
 
 ## Docker Compose
 
 The Compose project name defaults to the directory name, which already differs per worktree, so
 containers and volumes do not collide. Host ports do: replace fixed host ports with variables
-(`"${DB_PORT:-5432}:5432"`) and write those variables into `.env` in a `pre-start` step, hashed as
+(`"${DB_PORT:-5432}:5432"`) and write those variables to the env file Compose reads, hashed as
 above. That edit is to a tracked file, so it is a proposal for the user, not part of the setup.
 
 ## Environment managers
@@ -161,5 +154,5 @@ above. That edit is to a tracked file, so it is a proposal for the user, not par
 
 Every worktree shares `.git/config`, so `core.hooksPath` is the same everywhere. husky v9 points it
 at `.husky/_`, which is gitignored and written by the `prepare` script during install, so a
-worktree without the install has no working hooks and a push skips the gate. The dependency hook
+worktree without the install has no working hooks and a push skips the gate. The dependency step
 covers it; verify `.husky/_` exists in the throwaway worktree.
